@@ -163,6 +163,31 @@ def my_data(user: m.User = Depends(current_user), db: Session = Depends(get_db))
             select(m.AuditLog).where(m.AuditLog.user_id == user.id).order_by(m.AuditLog.timestamp)
         )
     )
+    match_rows = (
+        db.execute(
+            select(m.Match, m.Opportunity)
+            .join(m.Opportunity, m.Opportunity.id == m.Match.opportunity_id)
+            .where(m.Match.sme_id == org.id)
+        ).all()
+        if org and user.role == "sme"
+        else []
+    )
+    application_rows = (
+        list(
+            db.scalars(
+                select(m.Application)
+                .join(m.Match, m.Match.id == m.Application.match_id)
+                .where(m.Match.sme_id == org.id)
+            )
+        )
+        if org and user.role == "sme"
+        else []
+    )
+    own_opportunities = (
+        list(db.scalars(select(m.Opportunity).where(m.Opportunity.organisation_id == org.id)))
+        if org and user.role != "sme"
+        else []
+    )
     write_audit(db, user.id, "data_export", "user", user.id)
     db.commit()
     return {
@@ -206,6 +231,25 @@ def my_data(user: m.User = Depends(current_user), db: Session = Depends(get_db))
             }
             for v in checks
         ],
+        "matches": [
+            {
+                "opportunity": o.title,
+                "fit_score": float(mt.fit_score),
+                "readiness_score": float(mt.readiness_score),
+                "quadrant": mt.quadrant,
+                "status": mt.status,
+                "model_version": mt.model_version,
+                "explanation": mt.explanation,
+            }
+            for mt, o in match_rows
+        ],
+        "applications": [
+            {"status": a.status, "submitted_at": a.submitted_at} for a in application_rows
+        ],
+        "opportunities_published": [
+            {"title": o.title, "kind": o.kind, "status": o.status} for o in own_opportunities
+        ],
+        "note": "Uploaded files are not included here, only their records. Ask for the files separately.",
         "audit_events": [{"action": a.action, "timestamp": a.timestamp} for a in audit],
     }
 

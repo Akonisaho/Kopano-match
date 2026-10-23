@@ -173,6 +173,9 @@ def test_shortlist_writes_audit_row():
         "/admin/audit", params={"entity_type": "match", "entity_id": mid}, headers=admin
     ).json()
     assert trail[0]["action"] == "match_shortlisted" and trail[0]["new"]["status"] == "shortlisted"
+    # The reasoning is frozen into the append-only log at the moment of decision
+    snap = trail[0]["new"]["snapshot"]
+    assert snap["model_version"] == "v1" and "components" in snap and "gaps" in snap
 
 
 def test_consortium_covers_the_uncovered_opportunity():
@@ -382,3 +385,9 @@ def test_unmatched_opportunities_explain_why_in_plain_language():
     assert any("youth ownership" in b for b in grant["blockers"])
     matched = next(i for i in items if i["title"] == "Provincial roads rehabilitation")
     assert matched["match"] is not None and matched["blockers"] == []
+
+
+def test_data_export_includes_matches_and_applications():
+    data = client.get("/me/data", headers=login("sme-001@sme.demo")).json()
+    assert data["matches"] and "components" in data["matches"][0]["explanation"]
+    assert "applications" in data and "note" in data

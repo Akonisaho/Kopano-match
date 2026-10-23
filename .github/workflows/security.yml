@@ -69,6 +69,8 @@ jobs:
           npm ci
           npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON \
             --spec-version 1.6 --output-file ../sbom/frontend.cdx.json
+      - name: Licence check (fails on GPL, AGPL, SSPL or undeclared licences)
+        run: python scripts/check_licenses.py sbom/backend.cdx.json sbom/frontend.cdx.json
       - uses: actions/upload-artifact@v4
         with:
           name: sbom-${{ github.sha }}

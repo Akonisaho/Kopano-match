@@ -27,8 +27,16 @@ class Settings(BaseSettings):
     tax_provider: str = "mock"
     scanner_provider: str = "mock"
 
+    # Email: "log" keeps messages in memory; "brevo" sends them (needs a verified sender)
+    email_provider: str = "log"
+    brevo_api_key: str = ""
+    email_from: str = ""
+    email_from_name: str = "Kopano Match"
+    app_url: str = "http://localhost:5173"
+
     llm_provider: str = "gemini"
     gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.0-flash"  # change in .env if Google retires it
     anthropic_api_key: str = ""
 
     cors_origins: list[str] = ["http://localhost:5173"]

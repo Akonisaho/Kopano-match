@@ -85,3 +85,33 @@ ICT-NET, one with CON-BLDG. The opportunity page proposes the three as a consort
 - The mock tax provider returns non-compliant for one fixed registration number, and the registry
   returns not found for numbers ending in 7. Everything else verifies.
 - Credential costs and turnarounds are placeholders until verified with the issuers.
+
+## Make it feel live: AI summaries and real emails
+
+Both are optional. Without them the app uses built-in fallbacks and never breaks.
+
+**AI match summaries (Gemini).** Create a key in Google AI Studio and put it in `backend/.env`:
+```
+GEMINI_API_KEY=<your key>
+GEMINI_MODEL=gemini-2.0-flash
+```
+Change `GEMINI_MODEL` if Google retires that name. With a key, the summary on each match reads
+"AI-written from the figures". The prompt carries figures only: no names or identifiers. Scores
+are never set by the model.
+
+**Real emails (Brevo).** Create a Brevo account, verify a sender address, create an API key, then:
+```
+EMAIL_PROVIDER=brevo
+BREVO_API_KEY=<your key>
+EMAIL_FROM=<the verified sender address>
+EMAIL_FROM_NAME=Kopano Match
+APP_URL=http://localhost:5173
+```
+Three emails go out: a welcome on sign-up, "you have been shortlisted" to the SME, and "new
+application" to the buyer. They carry no scores or documents. Register your demo accounts with
+real inboxes you control, for example `you+sme1@gmail.com`, `you+buyer@gmail.com`, so every email
+lands in one place you can show on a second screen. Do not register other people's addresses.
+Check Brevo's current free-plan limits. Brevo acts as an operator of personal information, so an
+operator agreement is needed before any real deployment.
+
+Never commit `.env`. It is git-ignored.

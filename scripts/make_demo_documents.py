@@ -28,7 +28,11 @@ def escape(text: str) -> str:
 
 
 def make_pdf(lines: list[str]) -> bytes:
-    stream = "BT /F1 12 Tf 56 780 Td 18 TL " + " ".join(f"({escape(x)}) Tj T*" for x in lines) + " ET"
+    stream = (
+        "BT /F1 12 Tf 56 780 Td 18 TL "
+        + " ".join(f"({escape(x)}) Tj T*" for x in lines)
+        + " ET"
+    )
     objects = [
         "<< /Type /Catalog /Pages 2 0 R >>",
         "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -51,9 +55,13 @@ def make_pdf(lines: list[str]) -> bytes:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawTextHelpFormatter
+    )
     ap.add_argument("companies", nargs="+")
-    ap.add_argument("--types", default=",".join(CATALOGUE), help="comma-separated, default all")
+    ap.add_argument(
+        "--types", default=",".join(CATALOGUE), help="comma-separated, default all"
+    )
     args = ap.parse_args()
     types = [t.strip().upper() for t in args.types.split(",")]
     bad = [t for t in types if t not in CATALOGUE]
@@ -61,7 +69,9 @@ def main() -> None:
         raise SystemExit(f"Unknown types {bad}. Choose from {list(CATALOGUE)}")
     root = Path(__file__).resolve().parents[1] / "demo-documents"
     for company in args.companies:
-        folder = root / re.sub(r"[^A-Za-z0-9 _-]", "", company).strip().replace(" ", "_")
+        folder = root / re.sub(r"[^A-Za-z0-9 _-]", "", company).strip().replace(
+            " ", "_"
+        )
         folder.mkdir(parents=True, exist_ok=True)
         for code in types:
             title, issuer = CATALOGUE[code]

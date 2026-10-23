@@ -89,3 +89,12 @@ and build provenance attestation; container image scanning (there is no image ye
 | A shortlist or reject decision stores a frozen copy of the scores, rules and gaps in the append-only audit log | `routers/matches.py` | `test_shortlist_writes_audit_row` |
 | The data export includes matches and applications | `routers/auth.py` | `test_data_export_includes_matches_and_applications` |
 | Unlock Plan: a what-if that re-runs the real rules, saves nothing and is limited to the signed-in SME | `services.simulate`, `routers/smes.py` | `test_unlock_plan_moves_the_numbers_using_the_real_rules` |
+
+## Email and AI providers (optional, off by default)
+
+| Provider | Receives | Does not receive | Needed before real use |
+|---|---|---|---|
+| Brevo (service emails) | Recipient address and name, the message text | Scores, documents, ID data | Operator agreement; sender domain authentication (SPF, DKIM); confirm data location |
+| Gemini (summaries, drafting) | Figures from a match, or text the user pastes | Names and identifiers in match summaries | Operator agreement; decide what users may paste |
+
+A failed send or a failed model call never fails a request. Both providers sit behind adapters.

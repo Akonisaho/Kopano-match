@@ -501,3 +501,47 @@ def test_decision_dossier_has_rules_scores_sources_and_frozen_history():
         client.get(f"/matches/{mid}/dossier", headers=login("sme-005@sme.demo")).status_code == 404
     )
     assert client.get(f"/matches/{mid}/dossier", headers=register("corporate")).status_code == 404
+
+
+# ---- service emails (log mode: kept in memory, nothing leaves the machine) ----
+
+
+def test_service_emails_go_to_the_right_people_and_carry_no_scores():
+    from app.adapters.email import OUTBOX
+
+    OUTBOX.clear()
+    register("sme")
+    assert any(e["subject"] == "Welcome to Kopano Match" for e in OUTBOX)
+
+    OUTBOX.clear()
+    corp = login("corporate@kopano.demo")
+    opp = opp_id(corp, "Provincial roads rehabilitation")
+    ranked = client.get(f"/opportunities/{opp}/matches", headers=corp).json()
+    mid = next(r["match_id"] for r in ranked if r["sme_name"] == "Nomsa Builders")
+    client.post(f"/matches/{mid}/shortlist", headers=corp)
+    mail = [e for e in OUTBOX if e["to"] == "sme-002@sme.demo"]
+    assert mail and "shortlisted" in mail[-1]["subject"].lower()
+    assert "fit" not in mail[-1]["html"].lower() and "readiness" not in mail[-1]["html"].lower()
+
+    OUTBOX.clear()
+    sme = login("sme-005@sme.demo")
+    items = client.get("/smes/me/opportunities", headers=sme).json()
+    roads = next(i for i in items if i["title"] == "Provincial roads rehabilitation")
+    client.post(f"/applications/{roads['match']['match_id']}", headers=sme)
+    if not OUTBOX:  # already applied in an earlier run: the seed pre-applied this SME
+        return
+    assert any(
+        e["to"] == "corporate@kopano.demo" and "New application" in e["subject"] for e in OUTBOX
+    )
+
+
+def test_a_failing_email_provider_never_breaks_the_request(monkeypatch):
+    from app import notifications
+
+    class Broken:
+        def send(self, *a, **k):
+            raise RuntimeError("provider down")
+
+    monkeypatch.setattr(notifications, "email_sender", lambda: Broken())
+    h = register("sme")  # welcome email fails silently
+    assert client.get("/me", headers=h).status_code == 200

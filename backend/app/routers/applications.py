@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import models as m
+from .. import notifications
 from ..audit import write_audit
 from ..auth import PROVIDER_ROLES, current_user, require_role
 from ..db import get_db
@@ -46,6 +47,7 @@ def apply(
         db, user.id, "application_submit", "application", app.id, new={"match_id": str(match.id)}
     )
     db.commit()
+    notifications.application_received(db, match)
     return {"id": app.id, "status": "submitted"}
 
 

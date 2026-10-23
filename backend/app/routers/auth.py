@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from .. import models as m
 from ..adapters.mock import registry_provider, tax_provider
-from .. import ratelimit
+from .. import notifications, ratelimit
 from ..audit import write_audit
 from ..auth import current_user, hash_password, issue_token, verify_password
 from ..config import settings
@@ -87,6 +87,7 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
         new={"role": user.role, "consent_version": user.consent_version},
     )
     db.commit()
+    notifications.welcome(user)
     return {"access_token": issue_token(user), "token_type": "bearer", "role": user.role}
 
 

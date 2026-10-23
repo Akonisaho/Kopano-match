@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from .. import models as m
+from .. import notifications
 from ..audit import write_audit
 from ..auth import PROVIDER_ROLES, current_user, require_role
 from ..db import get_db
@@ -188,6 +189,7 @@ def _decide(match_id: uuid.UUID, new_status: str, user: m.User, db: Session) -> 
         },
     )
     db.commit()
+    notifications.match_decided(db, match, new_status)
     return {"match_id": match.id, "status": match.status}
 
 

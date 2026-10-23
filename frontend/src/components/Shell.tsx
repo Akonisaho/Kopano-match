@@ -3,22 +3,23 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { isProvider, tokenSecondsLeft, type Role } from '../api'
 import { roleLabel, useAuth } from '../auth'
 import { Logo } from '../ui'
+import NotificationBell from './NotificationBell'
 
 type NavItem = [path: string, label: string, icon: string]
 
 const NAV: Record<string, NavItem[]> = {
   sme: [['/app', 'Overview', 'OV'], ['/app/profile', 'Business profile', 'PF'], ['/app/verification', 'Verification', 'VR'],
-    ['/app/documents', 'Documents', 'DC'], ['/app/opportunities', 'Opportunities', 'OP'], ['/app/applications', 'Applications', 'AP'],
+    ['/app/documents', 'Documents', 'DC'], ['/app/opportunities', 'Opportunities', 'OP'], ['/app/applications', 'Applications', 'AP'], ['/app/consortia', 'Consortia', 'CN'],
     ['/app/security', 'Trust & security', 'SC']],
   provider: [['/app', 'Overview', 'OV'], ['/app/post', 'Post opportunity', 'PO'], ['/app/shortlist', 'Shortlists', 'SL'],
-    ['/app/applications', 'Applications', 'AP'], ['/app/smes', 'Verified SMEs', 'SME'], ['/app/insights', 'Unlock Map', 'UM'], ['/app/security', 'Trust & security', 'SC']],
+    ['/app/applications', 'Applications', 'AP'], ['/app/smes', 'Verified SMEs', 'SME'], ['/app/insights', 'Unlock Map', 'UM'], ['/app/impact', 'Impact', 'IM'], ['/app/security', 'Trust & security', 'SC']],
   admin: [['/app/queue', 'Review queue', 'RQ'], ['/app/security', 'Trust & security', 'SC']],
 }
 
 const TITLES: [string, string][] = [
   ['/app/profile', 'Business profile'], ['/app/verification', 'Verification centre'], ['/app/documents', 'Documents'],
   ['/app/opportunities/', 'Opportunity'], ['/app/opportunities', 'Opportunities'], ['/app/applications', 'Applications'],
-  ['/app/post', 'Create opportunity'], ['/app/shortlist', 'Shortlists'], ['/app/smes', 'Verified SMEs'], ['/app/insights', 'Unlock Map'],
+  ['/app/post', 'Create opportunity'], ['/app/shortlist', 'Shortlists'], ['/app/smes', 'Verified SMEs'], ['/app/insights', 'Unlock Map'], ['/app/impact', 'Impact report'], ['/app/consortia', 'Consortium invitations'],
   ['/app/security', 'Trust & security'], ['/app/queue', 'Review queue'], ['/app/matches/', 'Match detail'], ['/app', 'Dashboard'],
 ]
 
@@ -68,6 +69,7 @@ export default function Shell() {
         <header className="app-header">
           <h2>{title}</h2>
           <div className="header-actions">
+            <NotificationBell />
             <span className={`security-chip ${mins !== null && mins <= 5 ? 'warn' : ''}`} title="Access tokens expire after 30 minutes">
               Secure session · {roleLabel(me.role)}{mins !== null ? ` · ${mins} min left` : ''}
             </span>

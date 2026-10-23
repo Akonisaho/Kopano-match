@@ -54,6 +54,13 @@ class User(Base):
     consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Two-step sign-in. The secret is encrypted at rest; recovery codes are stored hashed.
+    totp_secret_enc: Mapped[str | None] = mapped_column(String(400))
+    totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    totp_last_step: Mapped[int | None] = mapped_column(BigInteger)
+    recovery_hashes: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), default=list, server_default=text("'{}'")
+    )
 
 
 class Organisation(Base):
@@ -199,6 +206,12 @@ class Application(Base):
     status: Mapped[str] = mapped_column(String(20), default="submitted")
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    awarded_value: Mapped[float | None] = mapped_column(Numeric(14, 2))
+    awarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # How ready the SME was at the moment of award. This is what lets us prove how much went to
+    # businesses a strict 'must hold every document' filter would have rejected.
+    gate_at_award: Mapped[str | None] = mapped_column(String(12))
+    quadrant_at_award: Mapped[str | None] = mapped_column(String(20))
 
 
 class AuditLog(Base):
@@ -216,3 +229,65 @@ class AuditLog(Base):
     old_value: Mapped[dict | None] = mapped_column(JSONB)
     new_value: Mapped[dict | None] = mapped_column(JSONB)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    __table_args__ = (
+        Index("ix_notifications_user", "user_id", text("created_at DESC")),
+        {"schema": "core"},
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), **PK)
+    user_id: Mapped[uuid.UUID] = mapped_column(fk("core.users.id"))
+    title: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
+    link: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PasswordReset(Base):
+    """Single-use reset links. Only a hash of the token is stored."""
+
+    __tablename__ = "password_resets"
+    __table_args__ = {"schema": "sensitive"}
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), **PK)
+    user_id: Mapped[uuid.UUID] = mapped_column(fk("core.users.id"))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
+
+
+class Consortium(Base):
+    """A proposed group of SMEs for one opportunity, and whether they have all said yes."""
+
+    __tablename__ = "consortia"
+    __table_args__ = (Index("ix_consortia_opportunity", "opportunity_id"), {"schema": "core"})
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), **PK)
+    opportunity_id: Mapped[uuid.UUID] = mapped_column(fk("core.opportunities.id"))
+    proposed_by: Mapped[uuid.UUID] = mapped_column(fk("core.users.id"))
+    lead_sme_id: Mapped[uuid.UUID] = mapped_column(fk("core.organisations.id"))
+    status: Mapped[str] = mapped_column(
+        String(12), default="proposed"
+    )  # proposed, formed, declined
+    coverage_pct: Mapped[float] = mapped_column(Numeric(5, 1))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ConsortiumMember(Base):
+    __tablename__ = "consortium_members"
+    __table_args__ = (
+        UniqueConstraint("consortium_id", "sme_id", name="uq_consortium_member"),
+        {"schema": "core"},
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), **PK)
+    consortium_id: Mapped[uuid.UUID] = mapped_column(fk("core.consortia.id"))
+    sme_id: Mapped[uuid.UUID] = mapped_column(fk("core.organisations.id"))
+    role: Mapped[str] = mapped_column(String(10), default="member")  # lead, member
+    scope_codes: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
+    response: Mapped[str] = mapped_column(
+        String(10), default="pending"
+    )  # pending, accepted, declined
+    responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

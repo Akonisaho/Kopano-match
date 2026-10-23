@@ -8,6 +8,6 @@ export const TRUST: Control[] = [
   { i: 'LOG', t: 'Tamper-proof audit', ok: true, d: 'Every state change is logged. The application database role has no UPDATE or DELETE on the audit table, so it cannot rewrite its own trail.' },
   { i: 'ACC', t: 'Role and object access', ok: true, d: 'Deny-by-default roles, repeated failed sign-ins are rate limited per account, and every read is scoped to the caller’s organisation. One SME cannot read another’s documents or matches.' },
   { i: 'POPIA', t: 'Your data, your control', ok: true, d: 'Consent is recorded with its version. Export everything held about you as JSON, or erase your account: personal details are anonymised and uploaded files are deleted, while the audit trail survives.' },
-  { i: 'MFA', t: 'MFA and password reset', ok: false, d: 'Multi-factor sign-in, email verification and password reset are not built yet.' },
-  { i: 'AV', t: 'Malware scanning', ok: false, d: 'Uploads pass a scanner interface, but today it is a mock that only catches the standard test file. A real antivirus engine is not wired. Encryption at rest and managed key storage are also on the roadmap.' },
+  { i: 'MFA', t: 'Two-step sign-in and password reset', ok: true, d: 'Optional authenticator-app sign-in with one-time recovery codes (secrets encrypted at rest) and single-use password reset links. Not yet required for any role, and email verification at sign-up is not built.' },
+  { i: 'AV', t: 'Malware scanning', ok: true, d: 'Every upload is scanned before it is stored, and refused if the scanner is down. In production the engine is ClamAV; local runs default to a mock that only catches the standard test file. Encryption at rest and managed key storage are on the roadmap.' },
 ]

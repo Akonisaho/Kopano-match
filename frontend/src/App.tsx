@@ -4,11 +4,13 @@ import Shell from './components/Shell'
 import { isProvider } from './api'
 import Landing from './pages/Landing'
 import Privacy from './pages/Privacy'
+import ResetPassword from './pages/ResetPassword'
 import { MatchDetail, SecurityCentre } from './pages/Shared'
-import { Applications, Documents, Onboarding, SmeOpportunities, SmeOverview, SmeProfilePage, VerificationCentre } from './pages/Sme'
+import { Applications, Consortia, Documents, Onboarding, SmeOpportunities, SmeOverview, SmeProfilePage, VerificationCentre } from './pages/Sme'
 import { OpportunityDetail, PostOpportunity, ProviderOverview, ShortlistPage, SmeDirectory } from './pages/Provider'
 import { AdminQueue } from './pages/Admin'
 import { Dossier } from './pages/Dossier'
+import { ImpactPage } from './pages/Impact'
 import { UnlockMap } from './pages/Insights'
 
 function Index() {
@@ -25,6 +27,7 @@ export default function App() {
       <Route path="/login" element={<Landing initialAuth="login" />} />
       <Route path="/register" element={<Landing initialAuth="signup" />} />
       <Route path="/privacy" element={<Privacy />} />
+      <Route path="/reset" element={<ResetPassword />} />
       <Route path="/onboarding" element={<RequireRole roles={['sme']}><Onboarding /></RequireRole>} />
       <Route path="/app" element={<RequireRole roles={['sme', 'corporate', 'funder', 'support', 'admin']}><Shell /></RequireRole>}>
         <Route index element={<Index />} />
@@ -39,6 +42,8 @@ export default function App() {
         <Route path="smes" element={<RequireRole roles="provider"><SmeDirectory /></RequireRole>} />
         <Route path="insights" element={<RequireRole roles="provider"><UnlockMap /></RequireRole>} />
         <Route path="matches/:id/dossier" element={<Dossier />} />
+        <Route path="impact" element={<RequireRole roles="provider"><ImpactPage /></RequireRole>} />
+        <Route path="consortia" element={<RequireRole roles={['sme']}><Consortia /></RequireRole>} />
         <Route path="queue" element={<RequireRole roles={['admin']}><AdminQueue /></RequireRole>} />
         <Route path="matches/:id" element={<MatchDetail />} />
         <Route path="security" element={<SecurityCentre />} />

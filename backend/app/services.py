@@ -182,6 +182,62 @@ def blockers_for(db: Session, org_id: uuid.UUID) -> dict[uuid.UUID, list[str]]:
     return out
 
 
+def labels_for(codes: list[str] | None) -> list[str]:
+    from .engine.taxonomy import CAPABILITIES
+
+    return [CAPABILITIES.get(c, ("", c))[1] for c in (codes or [])]
+
+
+def consortium_invitation(db: Session, opportunity_id: uuid.UUID) -> dict | None:
+    """The latest invitation for an opportunity, with every member's name and answer (buyer view)."""
+    cons = db.scalar(
+        select(m.Consortium)
+        .where(m.Consortium.opportunity_id == opportunity_id)
+        .order_by(m.Consortium.created_at.desc())
+        .limit(1)
+    )
+    if cons is None:
+        return None
+    members = list(
+        db.scalars(select(m.ConsortiumMember).where(m.ConsortiumMember.consortium_id == cons.id))
+    )
+    names = {
+        o.id: o.name
+        for o in db.scalars(
+            select(m.Organisation).where(m.Organisation.id.in_([x.sme_id for x in members]))
+        )
+    }
+    return {
+        "id": cons.id,
+        "status": cons.status,
+        "coverage_pct": float(cons.coverage_pct),
+        "members": [
+            {
+                "sme_id": x.sme_id,
+                "name": names[x.sme_id],
+                "role": x.role,
+                "scope": labels_for(x.scope_codes),
+                "response": x.response,
+            }
+            for x in members
+        ],
+    }
+
+
+def decision_snapshot(match: m.Match) -> dict:
+    """A frozen copy of what the decision-maker saw. Stored in the append-only audit log."""
+    return {
+        "model_version": match.model_version,
+        "gate": match.gate,
+        "quadrant": match.quadrant,
+        "fit": float(match.fit_score),
+        "readiness": float(match.readiness_score),
+        "components": match.explanation.get("components"),
+        "gaps": match.explanation.get("gaps"),
+        "risk_flags": match.risk_flags,
+    }
+
+
 def simulate(db: Session, org_id: uuid.UUID, credentials: list[str]) -> dict | None:
     """What changes if this SME obtains these credentials. Same rules, same catalogue, no guessing."""
     from dataclasses import replace
@@ -193,15 +249,27 @@ def simulate(db: Session, org_id: uuid.UUID, credentials: list[str]) -> dict | N
     sme = next((s for s in load_smes(db, only_visible=False) if s.id == str(org_id)), None)
     if sme is None:
         return None
-    after_sme = replace(
-        sme, documents={**sme.documents, **{c: DocStatus.VALID for c in credentials}}
-    )
-    opps = load_open_opportunities(db)
-    everything = list(opps.values())
+    everything = list(load_open_opportunities(db).values())
     titles = {
         str(o.id): (o.title, float(o.contract_value))
         for o in db.scalars(select(m.Opportunity).where(m.Opportunity.status == "open"))
     }
+
+    def with_docs(codes: list[str]):
+        return replace(sme, documents={**sme.documents, **{c: DocStatus.VALID for c in codes}})
+
+    def evaluate(variant):
+        ready, value, rows = 0, 0.0, {}
+        for opp in everything:
+            r = match_one(opp, variant, everything)
+            if r.gate == Gate.FAIL:
+                continue
+            title, worth = titles[opp.id]
+            now = r.quadrant == "award_now"
+            ready += now
+            value += worth if now else 0
+            rows[opp.id] = (r, title, worth)
+        return ready, value, rows
 
     def view(r):
         return {
@@ -211,54 +279,109 @@ def simulate(db: Session, org_id: uuid.UUID, credentials: list[str]) -> dict | N
             "gate": r.gate.value,
         }
 
-    rows, ready_before, ready_after, value_before, value_after = [], 0, 0, 0.0, 0.0
-    for opp in everything:
-        b = match_one(opp, sme, everything)
-        a = match_one(opp, after_sme, everything)
-        if b.gate == Gate.FAIL and a.gate == Gate.FAIL:
-            continue
-        title, value = titles[opp.id]
-        was, now = b.quadrant == "award_now", a.quadrant == "award_now"
-        ready_before += was
-        ready_after += now
-        value_before += value if was else 0
-        value_after += value if now else 0
+    b_ready, b_value, b_rows = evaluate(sme)
+    a_ready, a_value, a_rows = evaluate(with_docs(credentials))
+    rows = []
+    for oid in sorted(set(b_rows) | set(a_rows)):
+        before = b_rows.get(oid)
+        after = a_rows[oid]
         rows.append(
             {
-                "opportunity_id": opp.id,
-                "title": title,
-                "contract_value": value,
-                "before": None if b.gate == Gate.FAIL else view(b),
-                "after": view(a),
-                "newly_award_ready": now and not was,
+                "opportunity_id": oid,
+                "title": after[1],
+                "contract_value": after[2],
+                "before": view(before[0]) if before else None,
+                "after": view(after[0]),
+                "newly_award_ready": after[0].quadrant == "award_now"
+                and not (before and before[0].quadrant == "award_now"),
             }
         )
-    chosen = []
+    chosen, routes = [], []
     for code in credentials:
         c = COMPLIANCE_CATALOGUE[code]
         status = sme.documents.get(code, DocStatus.MISSING)
         if status == DocStatus.VALID:
             continue
         days = c.renew_days if status == DocStatus.EXPIRED else c.days
-        chosen.append(
-            {
-                "code": code,
-                "label": c.label,
-                "issuer": c.issuer,
-                "days": days,
-                "cost_zar": c.cost_zar,
-            }
+        item = {
+            "code": code,
+            "label": c.label,
+            "issuer": c.issuer,
+            "days": days,
+            "cost_zar": c.cost_zar,
+        }
+        chosen.append(item)
+        one_ready, one_value, _ = evaluate(with_docs([code]))
+        routes.append(
+            {**item, "gain_value": one_value - b_value, "newly_award_ready": one_ready - b_ready}
         )
+    # Best first move: the most contract value unlocked per day of waiting
+    routes.sort(key=lambda r: (-(r["gain_value"] / max(r["days"], 1)), r["days"]))
     return {
         "selected": chosen,
         # Credentials are obtained in parallel, so the wait is the longest one
         "total_days": max((c["days"] for c in chosen), default=0),
         "total_cost_zar": sum(c["cost_zar"] for c in chosen),
-        "before": {"award_ready": ready_before, "value": value_before},
-        "after": {"award_ready": ready_after, "value": value_after},
+        "before": {"award_ready": b_ready, "value": b_value},
+        "after": {"award_ready": a_ready, "value": a_value},
+        "routes": routes,
         "opportunities": sorted(
             rows, key=lambda r: (not r["newly_award_ready"], -r["contract_value"])
         ),
+    }
+
+
+def impact(db: Session, org_id: uuid.UUID | None) -> dict:
+    """What actually reached SMEs: awards, value, who, how fast, and how many a strict filter would
+    have turned away. Aggregates only, no names. org_id None means every provider (admin)."""
+    import statistics
+
+    q = (
+        select(m.Application, m.Match, m.Opportunity, m.SmeProfile)
+        .join(m.Match, m.Match.id == m.Application.match_id)
+        .join(m.Opportunity, m.Opportunity.id == m.Match.opportunity_id)
+        .join(m.SmeProfile, m.SmeProfile.organisation_id == m.Match.sme_id)
+    )
+    if org_id is not None:
+        q = q.where(m.Opportunity.organisation_id == org_id)
+    rows = list(db.execute(q))
+    awarded = [r for r in rows if r[0].awarded_at is not None]
+    total = sum(float(a.awarded_value) for a, *_ in awarded)
+
+    def share(flag: str) -> dict:
+        hit = [(a, p) for a, _, _, p in awarded if flag in (p.ownership or [])]
+        value = sum(float(a.awarded_value) for a, _ in hit)
+        return {
+            "awards": len(hit),
+            "value": value,
+            "share_pct": round(100 * value / total, 1) if total else 0.0,
+        }
+
+    def by(key) -> list[dict]:
+        out: dict[str, float] = {}
+        for a, mt, o, p in awarded:
+            out[key(o, p)] = out.get(key(o, p), 0.0) + float(a.awarded_value)
+        return [{"name": k, "value": v} for k, v in sorted(out.items(), key=lambda kv: -kv[1])]
+
+    days = [(a.awarded_at - o.created_at).days for a, _, o, _ in awarded]
+    gap = [a for a, *_ in awarded if a.gate_at_award == "remediable"]
+    return {
+        "applications": len(rows),
+        "awards": len(awarded),
+        "smes_awarded": len({mt.sme_id for _, mt, _, _ in awarded}),
+        "value_awarded": total,
+        "conversion_pct": round(100 * len(awarded) / len(rows), 1) if rows else 0.0,
+        "days_to_award_median": statistics.median(days) if days else None,
+        "days_to_award_mean": round(sum(days) / len(days), 1) if days else None,
+        "awarded_despite_gap": {
+            "awards": len(gap),
+            "value": sum(float(a.awarded_value) for a in gap),
+            "meaning": "Awarded to businesses that still had a document gap, so a strict "
+            "'must hold every document' filter would have rejected them.",
+        },
+        "ownership": {f: share(f) for f in ("youth", "black", "black_women")},
+        "by_province": by(lambda o, p: p.province),
+        "by_sector": by(lambda o, p: o.sector),
     }
 
 

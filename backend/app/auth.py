@@ -45,6 +45,8 @@ def current_user(token: str = Depends(oauth2), db: Session = Depends(get_db)) ->
     unauthorised = HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired token")
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])
+        if payload.get("purpose") is not None:  # e.g. a half-finished two-step sign-in
+            raise KeyError("not an access token")
         user = db.get(User, uuid.UUID(payload["sub"]))
     except (jwt.PyJWTError, ValueError, KeyError):
         raise unauthorised from None
@@ -68,3 +70,21 @@ def own_org_or_404(user: User, organisation_id: uuid.UUID) -> None:
     """Object-level authorisation. 404 rather than 403 so ids cannot be probed."""
     if user.role != "admin" and user.organisation_id != organisation_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
+
+
+def issue_mfa_token(user: User) -> str:
+    """Proves the password step only. Valid for five minutes and useless as an access token."""
+    exp = datetime.now(UTC) + timedelta(minutes=5)
+    return jwt.encode(
+        {"sub": str(user.id), "purpose": "mfa", "exp": exp}, settings.jwt_secret, ALGORITHM
+    )
+
+
+def read_mfa_token(token: str) -> uuid.UUID | None:
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])
+        if payload.get("purpose") != "mfa":
+            return None
+        return uuid.UUID(payload["sub"])
+    except (jwt.PyJWTError, ValueError, KeyError):
+        return None

@@ -28,9 +28,14 @@ def classify(name: str, licences: list[str]) -> str:
         return "unknown"
     joined = " ".join(licences).upper()
     weak = "LGPL" in joined or "LESSER GENERAL" in joined
-    strong = "AGPL" in joined or "SSPL" in joined or (
-        "GPL" in joined.replace("LGPL", "") and "GENERAL PUBLIC" in joined.replace("LESSER", "")
-        or "GPL-" in joined.replace("LGPL-", "").replace("AGPL-", "")
+    strong = (
+        "AGPL" in joined
+        or "SSPL" in joined
+        or (
+            "GPL" in joined.replace("LGPL", "")
+            and "GENERAL PUBLIC" in joined.replace("LESSER", "")
+            or "GPL-" in joined.replace("LGPL-", "").replace("AGPL-", "")
+        )
     )
     if strong and not weak:
         return "strong-copyleft"
@@ -49,7 +54,9 @@ def main(paths: list[Path]) -> int:
             kind = classify(c.get("name", ""), declared(c))
             counts[kind] = counts.get(kind, 0) + 1
             if kind in ("strong-copyleft", "weak-copyleft", "unknown"):
-                problems.append(f"  {kind}: {c.get('name')} {c.get('version', '')} {declared(c)}")
+                problems.append(
+                    f"  {kind}: {c.get('name')} {c.get('version', '')} {declared(c)}"
+                )
         print(f"{path.name}: {sum(counts.values())} components, {counts}")
         for line in problems:
             print(line)
@@ -59,5 +66,7 @@ def main(paths: list[Path]) -> int:
 
 
 if __name__ == "__main__":
-    args = [Path(a) for a in sys.argv[1:]] or sorted((ROOT / "docs" / "sbom").glob("*.cdx.json"))
+    args = [Path(a) for a in sys.argv[1:]] or sorted(
+        (ROOT / "docs" / "sbom").glob("*.cdx.json")
+    )
     sys.exit(main(args))

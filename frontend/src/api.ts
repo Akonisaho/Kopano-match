@@ -59,12 +59,22 @@ const json = (method: string, body?: unknown): RequestInit => ({
 
 export const api = {
   login: (email: string, password: string) =>
-    request<{ access_token: string; role: Role }>('/auth/login', {
+    request<LoginResult>('/auth/login', {
       method: 'POST',
       body: new URLSearchParams({ username: email, password }),
     }),
   register: (b: unknown) => request<{ access_token: string; role: Role }>('/auth/register', json('POST', b)),
   me: () => request<Me>('/me'),
+  mfaVerify: (mfa_token: string, code: string) =>
+    request<{ access_token: string; role: Role }>('/auth/mfa/verify', json('POST', { mfa_token, code })),
+  mfaSetup: () => request<MfaSetup>('/auth/mfa/setup', json('POST')),
+  mfaEnable: (code: string) => request<{ recovery_codes: string[] }>('/auth/mfa/enable', json('POST', { code })),
+  mfaDisable: (code: string) => request<{ status: string }>('/auth/mfa/disable', json('POST', { code })),
+  forgot: (email: string) => request<{ status: string }>('/auth/forgot', json('POST', { email })),
+  reset: (token: string, new_password: string) =>
+    request<{ status: string }>('/auth/reset', json('POST', { token, new_password })),
+  notifications: () => request<NotificationBox>('/notifications'),
+  markNotificationsRead: () => request<{ status: string }>('/notifications/read', json('POST')),
   myData: () => request<unknown>('/me/data'),
   myAudit: () => request<{ action: string; entity_type: string; timestamp: string }[]>('/me/audit'),
   deleteMe: () => request<unknown>('/me/delete', json('POST')),
@@ -94,7 +104,7 @@ export const api = {
     request<{ source: string; draft: ReqDraft }>('/opportunities/extract', json('POST', { text })),
   runMatch: (id: string) => request<MatchRow[]>(`/opportunities/${id}/match`, json('POST')),
   matches: (id: string) => request<MatchRow[]>(`/opportunities/${id}/matches`),
-  consortium: (id: string) => request<{ consortium: Consortium | null }>(`/opportunities/${id}/consortium`),
+  consortium: (id: string) => request<{ consortium: Consortium | null; invitation: ConsortiumInvitation | null }>(`/opportunities/${id}/consortium`),
   match: (id: string) => request<MatchDetail>(`/matches/${id}`),
   decide: (id: string, action: 'shortlist' | 'reject') => request<unknown>(`/matches/${id}/${action}`, json('POST')),
 
@@ -105,6 +115,15 @@ export const api = {
   directory: () => request<DirectorySme[]>('/providers/smes'),
   shortlist: () => request<ShortlistRow[]>('/providers/shortlist'),
   bottlenecks: () => request<UnlockMapData>('/providers/bottlenecks'),
+  impact: () => request<ImpactData>('/providers/impact'),
+  impactCsv: async () => (await raw('/providers/impact.csv')).blob(),
+  award: (matchId: string, value: number) =>
+    request<{ status: string; value: number }>(`/applications/${matchId}/award`, json('POST', { value })),
+  inviteConsortium: (oppId: string) =>
+    request<ConsortiumInvitation>(`/opportunities/${oppId}/consortium/invite`, json('POST')),
+  consortia: () => request<ConsortiumInvite[]>('/consortia'),
+  respondConsortium: (id: string, accept: boolean) =>
+    request<{ status: string; my_response: string }>(`/consortia/${id}/respond`, json('POST', { accept })),
   dossier: (id: string) => request<DossierData>(`/matches/${id}/dossier`),
 
   queue: () => request<Queue>('/admin/queue'),
@@ -114,12 +133,20 @@ export const api = {
     request<unknown>(`/admin/matches/${id}/review`, json('POST', { decision })),
 }
 
+export interface LoginResult {
+  access_token?: string; role?: Role; mfa_required?: boolean; mfa_token?: string
+}
+export interface MfaSetup { secret: string; otpauth_uri: string; qr: string }
+export interface NotificationBox {
+  unread: number
+  items: { id: string; title: string; body: string; link: string | null; created_at: string; read: boolean }[]
+}
 export type Role = 'sme' | 'corporate' | 'funder' | 'support' | 'admin'
 export type Quadrant = 'award_now' | 'coachable' | 'ready_weak_fit' | 'develop'
 export type Kind = 'procurement' | 'grant' | 'funding' | 'investor' | 'support'
 
 export interface Me {
-  id: string; email: string; full_name: string; role: Role
+  id: string; email: string; full_name: string; role: Role; mfa_enabled: boolean
   organisation: { id: string; name: string; verification_status: string } | null
 }
 export interface Taxonomy {
@@ -197,6 +224,7 @@ export interface UnlockResult {
   selected: { code: string; label: string; issuer: string; days: number; cost_zar: number }[]
   total_days: number
   total_cost_zar: number
+  routes: { code: string; label: string; issuer: string; days: number; cost_zar: number; gain_value: number; newly_award_ready: number }[]
   before: { award_ready: number; value: number }
   after: { award_ready: number; value: number }
   opportunities: {
@@ -221,6 +249,23 @@ export interface DossierData {
   verifications: Verification[]
   decisions: { action: string; at: string; by_role: string | null; by_organisation: string | null; snapshot: { fit: number; readiness: number; quadrant: Quadrant } | null }[]
   matches_decision_snapshot: boolean | null
+}
+export interface ImpactData {
+  applications: number; awards: number; smes_awarded: number; value_awarded: number; conversion_pct: number
+  days_to_award_median: number | null; days_to_award_mean: number | null
+  awarded_despite_gap: { awards: number; value: number; meaning: string }
+  ownership: Record<'youth' | 'black' | 'black_women', { awards: number; value: number; share_pct: number }>
+  by_province: { name: string; value: number }[]; by_sector: { name: string; value: number }[]
+}
+export interface ConsortiumInvitation {
+  id: string; status: 'proposed' | 'formed' | 'declined'; coverage_pct: number
+  members: { sme_id: string; name: string; role: string; scope: string[]; response: 'pending' | 'accepted' | 'declined' }[]
+}
+export interface ConsortiumInvite {
+  id: string; status: 'proposed' | 'formed' | 'declined'
+  opportunity: { id: string; title: string; contract_value: number; provider: string }
+  my_role: string; my_part: string[]; my_response: 'pending' | 'accepted' | 'declined'
+  partners: number; accepted: number; coverage_pct: number; partner_names: string[]
 }
 export interface SmeOpportunity {
   opportunity_id: string; title: string; kind: Kind; provider: string; provider_status: string

@@ -14,6 +14,9 @@ LANGUAGE sql SECURITY DEFINER SET search_path = core, pg_temp AS $$
          email = 'anonymised-' || uid::text || '@invalid',
          phone = NULL,
          password_hash = '!',
+         totp_secret_enc = NULL,
+         totp_enabled = false,
+         recovery_hashes = '{}',
          deleted_at = now()
    WHERE id = uid;
 $$;

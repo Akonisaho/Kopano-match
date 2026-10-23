@@ -6,6 +6,7 @@
 """
 
 from ..config import settings
+from .clamav import ClamAVScanner
 from .base import (
     IdentityProvider,
     MalwareScanner,
@@ -56,7 +57,7 @@ _PROVIDERS = {
     "identity": {"mock": MockIdentityProvider},
     "registry": {"mock": MockRegistryProvider},
     "tax": {"mock": MockTaxProvider},
-    "scanner": {"mock": MockMalwareScanner},
+    "scanner": {"mock": MockMalwareScanner, "clamav": ClamAVScanner},
 }
 
 

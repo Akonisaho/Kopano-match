@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from .. import models as m
+from .. import notifications
 from ..audit import write_audit
 from ..auth import PROVIDER_ROLES, current_user, require_role
 from ..db import get_db
@@ -162,6 +163,8 @@ def detail(
 
 def _decide(match_id: uuid.UUID, new_status: str, user: m.User, db: Session) -> dict:
     match = readable_match(db, user, match_id)
+    if match.status == "awarded":
+        raise HTTPException(409, "This match has already been awarded")
     old = match.status
     match.status = new_status
     write_audit(
@@ -188,6 +191,7 @@ def _decide(match_id: uuid.UUID, new_status: str, user: m.User, db: Session) -> 
         },
     )
     db.commit()
+    notifications.match_decided(db, match, new_status)
     return {"match_id": match.id, "status": match.status}
 
 

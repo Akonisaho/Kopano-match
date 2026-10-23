@@ -184,6 +184,19 @@ export function OpportunityDetail() {
   const cons = useLoad(() => api.consortium(id), [id])
   const [busy, setBusy] = useState(false)
   const [qf, setQf] = useState<Quadrant | 'all'>('all')
+  const [awarding, setAwarding] = useState<{ id: string; value: number } | null>(null)
+  async function confirmAward(a: { id: string; value: number }) {
+    try {
+      await api.award(a.id, a.value); setAwarding(null); rows.setData(await api.matches(id))
+      toast('Awarded. The business has been told, and the record is in the audit log.')
+    } catch (err) { toast((err as Error).message, 'error') }
+  }
+  async function invite() {
+    try {
+      await api.inviteConsortium(id); cons.reload()
+      toast('Invitations sent. Partner names stay hidden from the businesses until everyone accepts.')
+    } catch (err) { toast((err as Error).message, 'error') }
+  }
   if (o.error) return <ErrorNote error={o.error} />
   if (!o.data || !rows.data) return <Spinner />
   const opp = o.data
@@ -197,6 +210,7 @@ export function OpportunityDetail() {
     try { await api.decide(mid, a); rows.setData(await api.matches(id)); toast(a === 'shortlist' ? 'Shortlisted.' : 'Rejected.') } catch (err) { toast((err as Error).message, 'error') }
   }
   const c = cons.data?.consortium
+  const inv = cons.data?.invitation
   return (
     <>
       <Welcome eyebrow={KIND_LABEL[opp.kind]} title={opp.title}
@@ -214,7 +228,13 @@ export function OpportunityDetail() {
           {c && <Panel title="Consortium proposal" right={<Badge tone="purple">{c.coverage_pct}% covered</Badge>}>
             <p style={{ fontSize: 13, color: '#475467', lineHeight: 1.6, marginTop: 0 }}>No single SME covers this scope. These {c.members.length} together do.</p>
             {c.members.map((m) => <div key={m.sme_id} className="verify-row"><span className="check-circle">{m.sme_id === c.lead.sme_id ? '★' : '·'}</span><div><b>{m.name}</b><small>{m.sme_id === c.lead.sme_id ? 'Proposed lead (most ready)' : 'Member'}</small></div><span /></div>)}
-            {c.uncovered_codes.length > 0 && <p className="hint">Still uncovered: {c.uncovered_codes.join(', ')}</p>}</Panel>}
+            {c.uncovered_codes.length > 0 && <p className="hint">Still uncovered: {c.uncovered_codes.join(', ')}</p>}
+            {inv && inv.status !== 'declined' ? (
+              <div className="callout blue"><b>{inv.status === 'formed' ? 'Everyone accepted: consortium formed.' : 'Invitations sent, waiting for answers.'}</b>
+                {inv.members.map((x) => <div key={x.sme_id} style={{ marginTop: 6, fontSize: 12.5 }}>{x.name}: <b>{pretty(x.response)}</b> <span className="hint">({x.scope.join(', ') || 'scope to be agreed'})</span></div>)}</div>
+            ) : (<>
+              {inv?.status === 'declined' && <p className="callout amber" style={{ marginTop: 10 }}>The last invitation lapsed because a business declined. You can invite a new group.</p>}
+              <button className="btn btn-primary btn-small" style={{ marginTop: 12 }} onClick={invite}>Invite these businesses</button></>)}</Panel>}
           <Panel title="Requirements driving the score" sub="Rules, not prose.">
             {opp.requirements.length ? opp.requirements.map((r) => (
               <div key={r.id} className="verify-row"><span className={`check-circle ${r.mandatory ? '' : 'idle'}`}>{r.mandatory ? '!' : '+'}</span>
@@ -239,7 +259,13 @@ export function OpportunityDetail() {
               <td><Badge tone={r.verification_status === 'verified' ? 'green' : 'amber'}>{r.verification_status === 'verified' ? 'Verified' : 'In review'}</Badge></td>
               <td><div className="table-actions">{r.status === 'matched'
                 ? <><button className="btn btn-primary btn-small" onClick={() => decide(r.match_id, 'shortlist')}>Shortlist</button><button className="btn btn-outline btn-small" onClick={() => decide(r.match_id, 'reject')}>Reject</button></>
-                : <Badge tone={r.status === 'shortlisted' ? 'green' : 'gray'}>{pretty(r.status)}</Badge>}</div></td></tr>))}</tbody>
+                : r.status === 'shortlisted'
+                  ? (awarding?.id === r.match_id
+                    ? <><input aria-label="Award value in rand" type="number" min={1} value={awarding.value} onChange={(e) => setAwarding({ id: r.match_id, value: +e.target.value })} style={{ width: 130, border: '1px solid #d7deea', borderRadius: 9, padding: '7px 9px' }} />
+                        <button className="btn btn-primary btn-small" onClick={() => confirmAward(awarding)}>Confirm award</button>
+                        <button className="btn btn-outline btn-small" onClick={() => setAwarding(null)}>Cancel</button></>
+                    : <><Badge tone="green">Shortlisted</Badge><button className="btn btn-primary btn-small" onClick={() => setAwarding({ id: r.match_id, value: opp.contract_value })}>Award</button></>)
+                  : <Badge tone={r.status === 'awarded' ? 'purple' : 'gray'}>{pretty(r.status)}</Badge>}</div></td></tr>))}</tbody>
         </table></div> : <div className="empty"><strong>No matches yet</strong>Run matching, or relax a mandatory requirement.</div>}
       </Panel>
     </>

@@ -2,7 +2,7 @@
 
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ from .. import models as m
 from ..auth import PROVIDER_ROLES, require_role
 from ..db import get_db
 from ..services import bottlenecks
+from ..services import impact as impact_report
 from .applications import application_status
 
 router = APIRouter(
@@ -128,3 +129,54 @@ def shortlist(
         }
         for mt, o, org, a in db.execute(q)
     ]
+
+
+@router.get("/impact")
+def impact(
+    user: m.User = Depends(require_role(*PROVIDER_ROLES, "admin")), db: Session = Depends(get_db)
+):
+    """The buyer's own impact: what was awarded, to whom (in aggregate), and how fast."""
+    return impact_report(db, _own(user))
+
+
+@router.get("/impact.csv")
+def impact_csv(
+    user: m.User = Depends(require_role(*PROVIDER_ROLES, "admin")), db: Session = Depends(get_db)
+):
+    import csv
+    import io
+
+    d = impact_report(db, _own(user))
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["Metric", "Value"])
+    for label, value in [
+        ("Applications", d["applications"]),
+        ("Awards", d["awards"]),
+        ("SMEs awarded", d["smes_awarded"]),
+        ("Value awarded (ZAR)", round(d["value_awarded"])),
+        ("Application to award conversion (%)", d["conversion_pct"]),
+        ("Median days from publication to award", d["days_to_award_median"]),
+        ("Awards despite an open document gap", d["awarded_despite_gap"]["awards"]),
+        (
+            "Value awarded despite an open document gap (ZAR)",
+            round(d["awarded_despite_gap"]["value"]),
+        ),
+    ]:
+        w.writerow([label, value])
+    for flag, v in d["ownership"].items():
+        w.writerow(
+            [
+                f"Share of value awarded to {flag.replace('_', ' ')}-owned businesses (%)",
+                v["share_pct"],
+            ]
+        )
+    for row in d["by_province"]:
+        w.writerow([f"Value awarded in {row['name']} (ZAR)", round(row["value"])])
+    for row in d["by_sector"]:
+        w.writerow([f"Value awarded in sector {row['name']} (ZAR)", round(row["value"])])
+    return Response(
+        out.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="kopano-impact.csv"'},
+    )

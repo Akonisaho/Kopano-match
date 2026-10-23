@@ -1,7 +1,9 @@
 import json
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -44,6 +46,82 @@ def _rationale(match: m.Match, sme_name: str) -> tuple[str, str]:
     if text:
         return text, "llm"
     return prompts.fallback_rationale(sme_name, facts), "template"
+
+
+@router.get("/{match_id}/dossier")
+def dossier(
+    match_id: uuid.UUID, user: m.User = Depends(current_user), db: Session = Depends(get_db)
+):
+    """Everything needed to defend a decision later: the rules, the scores, the sources, the history."""
+    match = readable_match(db, user, match_id)
+    org = db.get(m.Organisation, match.sme_id)
+    opp = db.get(m.Opportunity, match.opportunity_id)
+    provider = db.get(m.Organisation, opp.organisation_id)
+    rules = db.scalars(
+        select(m.OpportunityRequirement).where(m.OpportunityRequirement.opportunity_id == opp.id)
+    )
+    history = db.execute(
+        select(m.AuditLog, m.User, m.Organisation)
+        .join(m.User, m.User.id == m.AuditLog.user_id, isouter=True)
+        .join(m.Organisation, m.Organisation.id == m.User.organisation_id, isouter=True)
+        .where(m.AuditLog.entity_type == "match", m.AuditLog.entity_id == str(match.id))
+        .order_by(m.AuditLog.timestamp.asc())
+    ).all()
+    decisions = [
+        {
+            "action": a.action,
+            "at": a.timestamp,
+            "by_role": u.role if u else None,
+            "by_organisation": o.name if o else None,
+            "snapshot": (a.new_value or {}).get("snapshot"),
+        }
+        for a, u, o in history
+    ]
+    frozen = next((d["snapshot"] for d in reversed(decisions) if d["snapshot"]), None)
+    current = {"fit": float(match.fit_score), "readiness": float(match.readiness_score)}
+    return {
+        "generated_at": datetime.now(UTC),
+        "match_id": match.id,
+        "model_version": match.model_version,
+        "opportunity": {
+            "title": opp.title,
+            "kind": opp.kind,
+            "provider": provider.name,
+            "contract_value": float(opp.contract_value),
+            "duration_months": opp.duration_months,
+            "payment_terms_days": opp.payment_terms_days,
+            "deadline": opp.deadline,
+        },
+        "sme": {
+            "name": org.name,
+            "verification_status": org.verification_status,
+        },
+        "rules": [
+            {
+                "type": r.requirement_type,
+                "value": r.requirement_value,
+                "mandatory": r.mandatory,
+                "weight": r.weight,
+            }
+            for r in rules
+        ],
+        "result": {
+            "gate": match.gate,
+            "quadrant": match.quadrant,
+            "fit": current["fit"],
+            "readiness": current["readiness"],
+            "components": match.explanation.get("components"),
+            "gaps": match.explanation.get("gaps"),
+            "risk_flags": match.risk_flags,
+        },
+        "status": match.status,
+        "verifications": verification_badges(db, org.id),
+        "decisions": decisions,
+        # True when the live scores still equal the ones frozen at the moment of decision
+        "matches_decision_snapshot": None
+        if frozen is None
+        else (frozen["fit"] == current["fit"] and frozen["readiness"] == current["readiness"]),
+    }
 
 
 @router.get("/{match_id}")

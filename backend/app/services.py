@@ -262,6 +262,70 @@ def simulate(db: Session, org_id: uuid.UUID, credentials: list[str]) -> dict | N
     }
 
 
+def bottlenecks(db: Session) -> dict:
+    """Which credential blocks the most good-fit SMEs, and how much contract value sits behind it.
+
+    Aggregates only: no SME names. A pair counts when the SME fits the opportunity (fit 60+),
+    is not structurally excluded, and is missing or has an expired mandatory credential.
+    """
+    from .engine.runner import match_one
+    from .engine.types import Gate
+
+    smes = load_smes(db)
+    opps = load_open_opportunities(db)
+    everything = list(opps.values())
+    value = {
+        str(o.id): float(o.contract_value)
+        for o in db.scalars(select(m.Opportunity).where(m.Opportunity.status == "open"))
+    }
+    agg: dict[str, dict] = {}
+    for opp in everything:
+        for sme in smes:
+            r = match_one(opp, sme, everything)
+            if r.gate == Gate.FAIL or r.fit < 60:
+                continue
+            gaps = [g for g in r.gaps if g.mandatory]
+            for g in gaps:
+                a = agg.setdefault(
+                    g.credential,
+                    {
+                        "label": g.label,
+                        "issuer": g.issuer,
+                        "days": g.days,
+                        "cost_zar": g.cost_zar,
+                        "smes": set(),
+                        "opps": set(),
+                        "sole": set(),
+                    },
+                )
+                a["smes"].add(sme.id)
+                a["opps"].add(opp.id)
+                if len(gaps) == 1:  # this credential is the only thing in the way
+                    a["sole"].add((sme.id, opp.id))
+    rows = [
+        {
+            "credential": code,
+            "label": a["label"],
+            "issuer": a["issuer"],
+            "days": a["days"],
+            "cost_zar": a["cost_zar"],
+            "smes_blocked": len(a["smes"]),
+            "opportunities_blocked": len(a["opps"]),
+            "value_locked": sum(value[o] for o in a["opps"]),
+            "would_unlock": len(a["sole"]),
+        }
+        for code, a in agg.items()
+    ]
+    rows.sort(key=lambda r: (-r["value_locked"], -r["smes_blocked"]))
+    locked = {o for a in agg.values() for o in a["opps"]}
+    return {
+        "rows": rows,
+        "total_value_locked": sum(value[o] for o in locked),
+        "smes_considered": len(smes),
+        "opportunities_considered": len(everything),
+    }
+
+
 def consortium(db: Session, opportunity_id: uuid.UUID):
     open_opps = load_open_opportunities(db)
     opp = open_opps.get(opportunity_id)

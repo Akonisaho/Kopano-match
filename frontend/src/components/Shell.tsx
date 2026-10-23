@@ -11,14 +11,14 @@ const NAV: Record<string, NavItem[]> = {
     ['/app/documents', 'Documents', 'DC'], ['/app/opportunities', 'Opportunities', 'OP'], ['/app/applications', 'Applications', 'AP'],
     ['/app/security', 'Trust & security', 'SC']],
   provider: [['/app', 'Overview', 'OV'], ['/app/post', 'Post opportunity', 'PO'], ['/app/shortlist', 'Shortlists', 'SL'],
-    ['/app/applications', 'Applications', 'AP'], ['/app/smes', 'Verified SMEs', 'SME'], ['/app/security', 'Trust & security', 'SC']],
+    ['/app/applications', 'Applications', 'AP'], ['/app/smes', 'Verified SMEs', 'SME'], ['/app/insights', 'Unlock Map', 'UM'], ['/app/security', 'Trust & security', 'SC']],
   admin: [['/app/queue', 'Review queue', 'RQ'], ['/app/security', 'Trust & security', 'SC']],
 }
 
 const TITLES: [string, string][] = [
   ['/app/profile', 'Business profile'], ['/app/verification', 'Verification centre'], ['/app/documents', 'Documents'],
   ['/app/opportunities/', 'Opportunity'], ['/app/opportunities', 'Opportunities'], ['/app/applications', 'Applications'],
-  ['/app/post', 'Create opportunity'], ['/app/shortlist', 'Shortlists'], ['/app/smes', 'Verified SMEs'],
+  ['/app/post', 'Create opportunity'], ['/app/shortlist', 'Shortlists'], ['/app/smes', 'Verified SMEs'], ['/app/insights', 'Unlock Map'],
   ['/app/security', 'Trust & security'], ['/app/queue', 'Review queue'], ['/app/matches/', 'Match detail'], ['/app', 'Dashboard'],
 ]
 

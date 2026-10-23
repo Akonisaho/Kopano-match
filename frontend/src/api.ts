@@ -104,6 +104,8 @@ export const api = {
   overview: () => request<ProviderOverview>('/providers/overview'),
   directory: () => request<DirectorySme[]>('/providers/smes'),
   shortlist: () => request<ShortlistRow[]>('/providers/shortlist'),
+  bottlenecks: () => request<UnlockMapData>('/providers/bottlenecks'),
+  dossier: (id: string) => request<DossierData>(`/matches/${id}/dossier`),
 
   queue: () => request<Queue>('/admin/queue'),
   reviewVerification: (id: string, decision: string) =>
@@ -202,6 +204,23 @@ export interface UnlockResult {
     before: { quadrant: Quadrant; fit: number; readiness: number } | null
     after: { quadrant: Quadrant; fit: number; readiness: number }
   }[]
+}
+export interface UnlockMapData {
+  rows: {
+    credential: string; label: string; issuer: string; days: number; cost_zar: number
+    smes_blocked: number; opportunities_blocked: number; value_locked: number; would_unlock: number
+  }[]
+  total_value_locked: number; smes_considered: number; opportunities_considered: number
+}
+export interface DossierData {
+  generated_at: string; match_id: string; model_version: string; status: string
+  opportunity: { title: string; kind: Kind; provider: string; contract_value: number; duration_months: number; payment_terms_days: number; deadline: string | null }
+  sme: { name: string; verification_status: string }
+  rules: { type: string; value: Record<string, unknown>; mandatory: boolean; weight: number }[]
+  result: { gate: string; quadrant: Quadrant; fit: number; readiness: number; components: Record<string, number> | null; gaps: Gap[] | null; risk_flags: RiskFlags }
+  verifications: Verification[]
+  decisions: { action: string; at: string; by_role: string | null; by_organisation: string | null; snapshot: { fit: number; readiness: number; quadrant: Quadrant } | null }[]
+  matches_decision_snapshot: boolean | null
 }
 export interface SmeOpportunity {
   opportunity_id: string; title: string; kind: Kind; provider: string; provider_status: string

@@ -282,6 +282,41 @@ def _fairness(smes, opps) -> dict:
     }
 
 
+def _robustness(smes, opps) -> dict:
+    """Do small changes to the inputs reshuffle the shortlist? Turnover moves up to 10% and years
+    trading by a year, as when a business rounds a figure or a year ticks over."""
+    rng = random.Random(11)
+    trials = 20
+    overlaps: list[float] = []
+    stable = total = 0
+    for o in opps:
+        base = match_all(o, smes, opps)
+        base_top = [r.sme_id for r in base][:3]
+        base_q = {r.sme_id: r.quadrant for r in base}
+        for _ in range(trials):
+            noisy = [
+                replace(
+                    s,
+                    turnover=s.turnover * rng.uniform(0.9, 1.1),
+                    years_trading=max(0, s.years_trading + rng.choice((-1, 0, 1))),
+                )
+                for s in smes
+            ]
+            now = match_all(o, noisy, opps)
+            now_top = [r.sme_id for r in now][:3]
+            overlaps.append(len(set(base_top) & set(now_top)) / max(1, len(base_top)))
+            now_q = {r.sme_id: r.quadrant for r in now}
+            for sid, q in base_q.items():
+                total += 1
+                stable += now_q.get(sid) == q
+    return {
+        "perturbation": "turnover up to 10% either way, years trading plus or minus one",
+        "trials": trials * len(opps),
+        "top3_overlap": round(sum(overlaps) / len(overlaps), 3),
+        "quadrant_stable": round(stable / max(1, total), 3),
+    }
+
+
 @lru_cache(maxsize=1)
 def evaluate() -> dict:
     smes, opps, _ = build_seed()
@@ -302,6 +337,7 @@ def evaluate() -> dict:
         },
         "benchmark": _benchmark(smes, opps, results),
         "determinism": _determinism(smes, opps),
+        "robustness": _robustness(smes, opps),
         "fairness": _fairness(smes, opps),
         "limitations": LIMITATIONS,
         "human_oversight": HUMAN_OVERSIGHT,

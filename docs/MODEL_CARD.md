@@ -25,6 +25,7 @@ Rank and explain candidates so a person can shortlist. Never to award, reject or
 | Meaning check | Compares opportunity text and capabilities by meaning | No name, ownership or size in the prompt; never changes a score |
 | Feedback summary | Condenses ratings and comments | Uses only what was written; falls back to figures |
 | Match note | Wording of the explanation | Template fallback |
+| Semantic search | Gemini embeddings rank opportunities (for a business) or businesses (for a buyer) against a typed description | Ranks what to look at, never who qualifies; the rule-based position is shown beside each result; keyword fallback; only sector, location, years and capabilities are embedded |
 
 Prompts treat user text as data. Outputs are validated against schemas and enums, so a prompt
 injection can at worst give an empty or wrong draft that a person reviews.
@@ -41,6 +42,7 @@ Information Officer (POPIA).
   sector-only matching and random order. The engine matches fit-only on NDCG and beats it on precision
   because it also weighs readiness. Both beat sector-only and random by a wide margin.
 - **Determinism:** two runs give an identical fingerprint.
+- **Robustness:** turnover moved up to 10% either way and years trading by a year, across 180 trials. About 96% of the top three survive, and about 97% of businesses keep their quadrant.
 - **Cost of hard gates:** a small number of rubric-relevant pairs are excluded by hard requirements.
   It is reported, not hidden.
 

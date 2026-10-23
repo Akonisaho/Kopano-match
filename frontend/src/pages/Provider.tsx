@@ -1,4 +1,4 @@
-import { ImportPanel } from '../components/AiPanels'
+import { ImportPanel, IngestPanel, SemanticSearch } from '../components/AiPanels'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
@@ -132,6 +132,7 @@ export function PostOpportunity() {
     <>
       <Welcome title="Create an opportunity" text="Requirements are rules, not prose. Each row is a gate (mandatory) or a weighted preference, and that is what makes every match explainable." />
       <ImportPanel />
+      <IngestPanel />
       <form onSubmit={submit}><Panel title="Opportunity details" right={<Badge tone="green">{FOCUS[role]}</Badge>}>
         <ErrorNote error={error} />
         <details style={{ marginBottom: 18 }}><summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Draft requirements from tender text (optional)</summary>
@@ -307,6 +308,7 @@ export function SmeDirectory() {
   return (
     <>
       <Welcome title="Verified SME directory" text="Businesses that chose to be visible. Verification reflects the checks actually run; ownership details are deliberately not listed here." />
+      <SemanticSearch mode="provider" />
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <input aria-label="Search by name" placeholder="Search by name" value={q} onChange={(e) => setQ(e.target.value)} style={{ border: '1px solid #d7deea', borderRadius: 11, padding: '10px 13px', minWidth: 260 }} />
         <select aria-label="Sector" value={sector} onChange={(e) => setSector(e.target.value)} style={{ border: '1px solid #d7deea', borderRadius: 11, padding: '10px 13px' }}>

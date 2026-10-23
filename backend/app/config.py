@@ -40,6 +40,7 @@ class Settings(BaseSettings):
 
     llm_provider: str = "gemini"
     gemini_api_key: str = ""
+    embedding_model: str = "gemini-embedding-001"
     gemini_model: str = "gemini-3.1-flash-lite"  # change in .env if Google retires it
     anthropic_api_key: str = ""
 

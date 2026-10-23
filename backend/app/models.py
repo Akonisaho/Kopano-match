@@ -334,3 +334,19 @@ class AiInsight(Base):
     input_hash: Mapped[str] = mapped_column(String(64))
     payload: Mapped[dict] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
+
+
+class ApiKey(Base):
+    """A key a buyer's own system uses to post opportunities. Only a hash is stored."""
+
+    __tablename__ = "api_keys"
+    __table_args__ = {"schema": "core"}
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), **PK)
+    organisation_id: Mapped[uuid.UUID] = mapped_column(fk("core.organisations.id"))
+    created_by: Mapped[uuid.UUID] = mapped_column(fk("core.users.id"))
+    name: Mapped[str] = mapped_column(String(60))
+    prefix: Mapped[str] = mapped_column(String(12))
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

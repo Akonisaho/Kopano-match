@@ -163,3 +163,11 @@ agreement to bid together, not a legal agreement between them.
 Honest limits: sending a document to Gemini shares it with a third party, so it is opt-in per document
 and the demo asks for sample files. Feedback is opinion, so it is disputable, never an automatic bar.
 
+| Control | Where | Proven by |
+|---|---|---|
+| Ingest keys are random, hashed at rest, shown once, scoped to one organisation, revocable, and every call is audited | `routers/ingest.py` | `test_procurement_system_feed_with_api_key` |
+| Semantic search embeds only sector, location, years and capabilities, never names or ownership; hidden businesses never appear | `insights.search_smes` | `test_semantic_search_ranks_by_meaning_and_falls_back_to_keywords` |
+
+Honest limit: the text a person types into semantic search is sent to the embedding service. It is not
+stored, and the page says what is compared.
+

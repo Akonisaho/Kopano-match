@@ -1,13 +1,16 @@
 """Feedback, AI document reading, semantic relevance, CSV import, deadline alerts, ecosystem view
 and the published evaluation. Needs a seeded database, like test_api.py."""
 
+import re
 import uuid
+import zlib
 from datetime import date, timedelta
 
 from sqlalchemy import text
 
 from app.db import engine
 from app.llm import client as llm
+from app.llm import embed as embed_mod
 from app.llm import prompts
 
 from .test_api import PDF, _match_id, client, login, opp_id, register
@@ -333,3 +336,139 @@ def test_profile_quality_flags_inconsistent_figures():
     assert put.status_code == 200, put.text
     flags = " ".join(f["text"] for f in client.get("/smes/me/quality", headers=sme).json()["flags"])
     assert "three times" in flags and "years trading is 0" in flags
+
+
+# ---------------------------------------------------------------- semantic search and ingestion
+
+
+def _fake_embed(texts, task="RETRIEVAL_DOCUMENT"):
+    """Stands in for the embedding service: a bag of hashed words, stable across processes."""
+    out = []
+    for t in texts:
+        v = [0.0] * 1024
+        for w in re.findall(r"[a-z]{3,}", t.lower()):
+            v[zlib.crc32(w.encode()) % 1024] += 1.0
+        out.append(v)
+    return out
+
+
+def _clear_embeddings() -> None:
+    with engine.begin() as c:
+        c.execute(text("delete from core.ai_insights where kind = 'embedding'"))
+
+
+def test_semantic_search_ranks_by_meaning_and_falls_back_to_keywords(monkeypatch):
+    _clear_embeddings()
+    calls = []
+
+    def counting(texts, task="RETRIEVAL_DOCUMENT"):
+        calls.append(task)
+        return _fake_embed(texts, task)
+
+    monkeypatch.setattr(embed_mod, "embed", counting)
+    sme = login(_email_of("Khaya Earthworks"))
+    r = client.post(
+        "/smes/me/search",
+        headers=sme,
+        json={"query": "rehabilitation of provincial roads and drainage"},
+    ).json()
+    assert r["source"] == "embeddings" and r["results"]
+    assert any("road" in x["title"].lower() for x in r["results"][:3])
+    assert r["results"][0]["similarity"] >= r["results"][-1]["similarity"]
+    top = r["results"][0]
+    assert top["match"] is None or {"fit", "readiness", "quadrant"} <= set(top["match"])
+    first_calls = len(calls)
+    client.post(
+        "/smes/me/search", headers=sme, json={"query": "rehabilitation of provincial roads"}
+    )
+    assert (
+        len(calls) == first_calls + 1
+    )  # only the query is embedded again; opportunities are cached
+
+    # A buyer searches businesses by description; hidden businesses never appear
+    corp = login("corporate@kopano.demo")
+    found = client.post(
+        "/providers/search", headers=corp, json={"query": "road construction and civil engineering"}
+    ).json()
+    assert found["source"] == "embeddings" and found["results"]
+    visible = {s["id"] for s in client.get("/providers/smes", headers=corp).json()}
+    assert all(x["sme_id"] in visible for x in found["results"])
+    assert "ownership" not in str(found)
+    assert client.post("/providers/search", headers=sme, json={"query": "roads"}).status_code == 403
+    assert client.post("/smes/me/search", headers=corp, json={"query": "roads"}).status_code == 403
+    assert client.post("/smes/me/search", headers=sme, json={"query": "ab"}).status_code == 422
+
+    # No embedding service: plain keyword overlap, and it says so
+    _clear_embeddings()
+    monkeypatch.setattr(embed_mod, "embed", lambda *a, **k: None)
+    k = client.post(
+        "/smes/me/search", headers=sme, json={"query": "provincial roads drainage"}
+    ).json()
+    assert k["source"] == "keywords" and k["results"][0]["similarity"] >= 0
+    _clear_embeddings()
+
+
+def _opp_body(title: str) -> dict:
+    return {
+        "kind": "procurement",
+        "title": title,
+        "sector": "construction",
+        "province": "Gauteng",
+        "contract_value": 900_000,
+        "duration_months": 6,
+        "scope_items": [{"code": "CON-ROADS", "value": 900_000}],
+        "requirements": [],
+    }
+
+
+def test_procurement_system_feed_with_api_key():
+    corp = login("corporate@kopano.demo")
+    other = register("corporate")
+    sme = login("sme-001@sme.demo")
+    assert client.post("/ingest/keys", headers=sme, json={"name": "mine"}).status_code == 403
+
+    made = client.post("/ingest/keys", headers=corp, json={"name": "SAP export"})
+    assert made.status_code == 201
+    key = made.json()["key"]
+    assert key.startswith("kmk_") and "not shown again" in made.json()["note"]
+    # Only a hash is kept: the key is never listed again
+    listed = client.get("/ingest/keys", headers=corp).json()
+    assert key not in str(listed) and any(k["name"] == "SAP export" for k in listed)
+
+    title = f"Fed from ERP {uuid.uuid4().hex[:6]}"
+    body = {"opportunities": [_opp_body(title), _opp_body(title + " B")]}
+    assert client.post("/ingest/opportunities", json=body).status_code == 401  # no key
+    assert (
+        client.post(
+            "/ingest/opportunities", headers={"X-API-Key": "kmk_wrong"}, json=body
+        ).status_code
+        == 401
+    )
+    ok = client.post("/ingest/opportunities", headers={"X-API-Key": key}, json=body)
+    assert ok.status_code == 201 and ok.json()["created"] == 2
+    mine = [o["title"] for o in client.get("/opportunities", headers=corp).json()]
+    assert title in mine
+    assert title not in [o["title"] for o in client.get("/opportunities", headers=other).json()]
+    ranked = client.get(f"/opportunities/{opp_id(corp, title)}/matches", headers=corp).json()
+    assert ranked  # matched on arrival, so businesses see it straight away
+
+    bad = {"opportunities": [{**_opp_body("x"), "sector": "mining"}]}
+    assert (
+        client.post("/ingest/opportunities", headers={"X-API-Key": key}, json=bad).status_code
+        == 422
+    )
+    # Another buyer cannot revoke it; the owner can, and the feed stops at once
+    kid = next(k["id"] for k in listed if k["name"] == "SAP export")
+    assert client.post(f"/ingest/keys/{kid}/revoke", headers=other).status_code == 404
+    assert client.post(f"/ingest/keys/{kid}/revoke", headers=corp).json()["revoked"] is True
+    assert (
+        client.post("/ingest/opportunities", headers={"X-API-Key": key}, json=body).status_code
+        == 401
+    )
+    actions = [a["action"] for a in client.get("/me/audit", headers=corp).json()]
+    assert "ingest_key_created" in actions and "ingest_opportunities" in actions
+
+
+def test_published_evaluation_includes_robustness_to_small_input_changes():
+    e = client.get("/meta/evaluation").json()
+    assert e["robustness"]["top3_overlap"] >= 0.8 and e["robustness"]["quadrant_stable"] >= 0.8

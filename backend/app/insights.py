@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from . import models as m
 from .engine.taxonomy import CAPABILITIES, COMPLIANCE_CATALOGUE
 from .llm import client, prompts
+from .llm import embed as emb
 
 CRITERIA = {
     "quality": "Quality of work",
@@ -169,6 +170,9 @@ def semantic(db: Session, match: m.Match) -> dict:
             "concerns": [],
             "rationale": "Keyword overlap only, because the AI reader is not available right now.",
         }
+    vecs = _vectors(db, [(opp.id, _opp_text(opp)), (match.sme_id, _sme_text(profile))])
+    if vecs:
+        out["embedding_similarity"] = emb.calibrated(emb.cosine(vecs[opp.id], vecs[match.sme_id]))
     out["advisory"] = "Shown beside the score. It never changes a score, a gate or a shortlist."
     _store(db, "semantic", match.id, h, out)
     return out
@@ -345,4 +349,131 @@ def ecosystem(db: Session) -> dict:
             "assumption": f"{JOBS_PER_R1M:g} jobs per R1m awarded. This is a placeholder, not a "
             "measured figure; replace it with YES's own coefficient.",
         },
+    }
+
+
+# ---------------------------------------------------------------- semantic search
+
+
+def _opp_text(o: m.Opportunity) -> str:
+    scope = [CAPABILITIES.get(i["code"], ("", i["code"]))[1] for i in o.scope_items]
+    return (
+        f"{o.title}. Sector {o.sector}, {o.province}. Needs {', '.join(scope)}. "
+        f"{(o.description or '')[:1200]}"
+    )
+
+
+def _sme_text(p: m.SmeProfile) -> str:
+    caps = [CAPABILITIES.get(c, ("", c))[1] for c in (p.capability_codes or [])]
+    return (
+        f"Sector {p.sector}, {p.province}. {p.years_trading} years trading. "
+        f"Offers {', '.join(caps) or 'nothing listed'}."
+    )
+
+
+def _vectors(
+    db: Session, items: list[tuple[uuid.UUID, str]]
+) -> dict[uuid.UUID, list[float]] | None:
+    """Embeddings for these items, from the cache where the text is unchanged. None if unavailable."""
+    found: dict[uuid.UUID, list[float]] = {}
+    missing: list[tuple[uuid.UUID, str, str]] = []
+    rows = {
+        r.subject_id: r
+        for r in db.scalars(
+            select(m.AiInsight).where(
+                m.AiInsight.kind == "embedding", m.AiInsight.subject_id.in_([i for i, _ in items])
+            )
+        )
+    }
+    for sid, text in items:
+        h = _hash([text, "embedding", emb.DIMENSIONS])
+        row = rows.get(sid)
+        if row is not None and row.input_hash == h:
+            found[sid] = row.payload["v"]
+        else:
+            missing.append((sid, text, h))
+    if missing:
+        got = emb.embed([t for _, t, _ in missing], "RETRIEVAL_DOCUMENT")
+        if got is None:
+            return None
+        for (sid, _, h), vec in zip(missing, got, strict=True):
+            found[sid] = vec
+            row = rows.get(sid)
+            if row is None:
+                db.add(
+                    m.AiInsight(kind="embedding", subject_id=sid, input_hash=h, payload={"v": vec})
+                )
+            else:
+                row.input_hash, row.payload = h, {"v": vec}
+        db.commit()
+    return found
+
+
+def _rank(db: Session, query: str, items: list[tuple[uuid.UUID, str]]) -> tuple[str, dict]:
+    """Similarity 0-100 for each item against the query. Embeddings if available, else keywords."""
+    q = emb.embed([query], "RETRIEVAL_QUERY")
+    vecs = _vectors(db, items) if q else None
+    if q and vecs:
+        return "embeddings", {i: emb.calibrated(emb.cosine(q[0], vecs[i])) for i, _ in items}
+    want = _words(query)
+    return "keywords", {i: round(100 * len(want & _words(t)) / max(1, len(want))) for i, t in items}
+
+
+def search_opportunities(db: Session, org_id: uuid.UUID, query: str) -> dict:
+    """A business describes what it does or wants; open opportunities come back by meaning, each with
+    the rule-based position beside it. Similarity says what to look at, never who is eligible."""
+    opps = list(db.scalars(select(m.Opportunity).where(m.Opportunity.status == "open")))
+    source, sims = _rank(db, query, [(o.id, _opp_text(o)) for o in opps])
+    mine = {
+        mt.opportunity_id: mt for mt in db.scalars(select(m.Match).where(m.Match.sme_id == org_id))
+    }
+    rows = []
+    for o in sorted(opps, key=lambda o: -sims[o.id])[:8]:
+        mt = mine.get(o.id)
+        rows.append(
+            {
+                "opportunity_id": o.id,
+                "title": o.title,
+                "kind": o.kind,
+                "sector": o.sector,
+                "province": o.province,
+                "contract_value": float(o.contract_value),
+                "similarity": sims[o.id],
+                "match": None
+                if mt is None
+                else {
+                    "match_id": mt.id,
+                    "quadrant": mt.quadrant,
+                    "fit": float(mt.fit_score),
+                    "readiness": float(mt.readiness_score),
+                },
+            }
+        )
+    return {"source": source, "results": rows}
+
+
+def search_smes(db: Session, query: str) -> dict:
+    """A buyer describes what it needs; businesses that chose to be visible come back by meaning.
+    Only sector, location, years and capabilities are compared: no ownership, no size, no name."""
+    rows = db.execute(
+        select(m.SmeProfile, m.Organisation)
+        .join(m.Organisation, m.Organisation.id == m.SmeProfile.organisation_id)
+        .where(m.SmeProfile.visible_to_corporates.is_(True))
+    ).all()
+    source, sims = _rank(db, query, [(org.id, _sme_text(p)) for p, org in rows])
+    ranked = sorted(rows, key=lambda r: -sims[r[1].id])[:8]
+    return {
+        "source": source,
+        "results": [
+            {
+                "sme_id": org.id,
+                "name": org.name,
+                "sector": p.sector,
+                "province": p.province,
+                "years_trading": p.years_trading,
+                "verification_status": org.verification_status,
+                "similarity": sims[org.id],
+            }
+            for p, org in ranked
+        ],
     }

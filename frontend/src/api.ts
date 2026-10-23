@@ -147,6 +147,11 @@ export const api = {
     const form = new FormData(); form.append('file', file)
     return request<ImportResult>(`/opportunities/import?dry_run=${dryRun}`, { method: 'POST', body: form })
   },
+  searchOpportunities: (query: string) => request<SearchResult<OppHit>>('/smes/me/search', json('POST', { query })),
+  searchSmes: (query: string) => request<SearchResult<SmeHit>>('/providers/search', json('POST', { query })),
+  ingestKeys: () => request<IngestKey[]>('/ingest/keys'),
+  createIngestKey: (name: string) => request<IngestKey & { key: string }>('/ingest/keys', json('POST', { name })),
+  revokeIngestKey: (id: string) => request<IngestKey>(`/ingest/keys/${id}/revoke`, json('POST')),
   importTemplate: async () => (await raw('/opportunities/import/template')).blob(),
 
   queue: () => request<Queue>('/admin/queue'),
@@ -374,7 +379,7 @@ export interface DocReading {
 }
 export interface Semantic {
   source: 'ai' | 'keywords'; score: number; matched_themes: string[]; concerns: string[]
-  rationale: string; advisory: string
+  rationale: string; advisory: string; embedding_similarity?: number
 }
 export interface ImportResult { rows: number; created: number; errors: { row: number; error: string }[]; titles: string[] }
 export interface Ecosystem {
@@ -399,6 +404,7 @@ export interface Evaluation {
     relevant_pairs: number; relevant_excluded_by_gates: number
   }
   determinism: { identical: boolean; fingerprint: string; runs: number }
+  robustness: { perturbation: string; trials: number; top3_overlap: number; quadrant_stable: number }
   fairness: {
     counterfactual_pairs: number; scores_changed_by_ownership: number; disclosed_max_fit_effect: number
     groups: { group: string; businesses: number; kept_rate: number; award_ready_rate: number }[]
@@ -407,3 +413,14 @@ export interface Evaluation {
   }
   limitations: string[]; human_oversight: string[]
 }
+
+export interface SearchResult<T> { source: 'embeddings' | 'keywords'; results: T[] }
+export interface OppHit {
+  opportunity_id: string; title: string; kind: Kind; sector: string; province: string; contract_value: number
+  similarity: number; match: null | { match_id: string; quadrant: Quadrant; fit: number; readiness: number }
+}
+export interface SmeHit {
+  sme_id: string; name: string; sector: string; province: string; years_trading: number
+  verification_status: string; similarity: number
+}
+export interface IngestKey { id: string; name: string; prefix: string; created_at: string; last_used_at: string | null; revoked: boolean }

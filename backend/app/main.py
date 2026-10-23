@@ -11,6 +11,7 @@ from .routers import (
     consortia,
     documents,
     feedback,
+    ingest,
     matches,
     meta,
     notifications,
@@ -73,6 +74,7 @@ for r in (
     notifications,
     consortia,
     feedback,
+    ingest,
 ):
     app.include_router(r.router)
 

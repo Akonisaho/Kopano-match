@@ -5,7 +5,7 @@ import {
   type Doc, type Gap, type Kind, type Profile, type ProfileResponse, type Taxonomy, type UnlockResult, type Verification,
 } from '../api'
 import { useAuth } from '../auth'
-import { ProfileHealth, ReadWithAi } from '../components/AiPanels'
+import { ProfileHealth, ReadWithAi, SemanticSearch } from '../components/AiPanels'
 import { useLoad } from '../hooks'
 import {
   Badge, ErrorNote, GapCard, Logo, Metric, MiniBar, Panel, QuadrantBadge, ScoreRing, Spinner, VerificationRow, Welcome, useToast,
@@ -407,6 +407,7 @@ export function SmeOpportunities() {
   return (
     <>
       <Welcome title="Opportunities" text="Every open opportunity, with your own fit and readiness where you are eligible. Where you are not matched, a mandatory requirement is unmet." />
+      <SemanticSearch mode="sme" />
       <div className="chips" style={{ marginBottom: 16 }}>
         {(['all', ...kinds] as (Kind | 'all')[]).map((k) => (
           <button key={k} className="chip" style={kind === k ? { background: '#4c1d95', color: '#fff', borderColor: '#4c1d95' } : undefined} onClick={() => setKind(k)}>{k === 'all' ? 'All' : KIND_LABEL[k]}</button>))}

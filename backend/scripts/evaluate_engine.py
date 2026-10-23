@@ -31,6 +31,11 @@ def main(check: bool) -> int:
     print(
         f"\nDeterminism: identical={r['determinism']['identical']} fingerprint {r['determinism']['fingerprint']}"
     )
+    rb = r["robustness"]
+    print(
+        f"\nRobustness ({rb['perturbation']}): top-3 overlap {rb['top3_overlap']}, "
+        f"quadrant unchanged {rb['quadrant_stable']}"
+    )
     print(
         f"\nFairness: {f['scores_changed_by_ownership']} of {f['counterfactual_pairs']} neutral pairs changed when ownership was flipped"
     )
@@ -50,6 +55,8 @@ def main(check: bool) -> int:
         failures.append("matching is not deterministic")
     if f["scores_changed_by_ownership"]:
         failures.append("ownership changed a score on a neutral opportunity")
+    if r["robustness"]["top3_overlap"] < 0.8:
+        failures.append("shortlist is unstable under small input changes")
     engine, fit_only = b["methods"][0], b["methods"][1]
     for m in b["methods"][2:]:
         if engine["ndcg_at_5"] <= m["ndcg_at_5"]:

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
-import { api, dateFmt, pretty, type Doc, type DocReading, type ImportResult, type Semantic, type Performance } from '../api'
+import { Link } from 'react-router-dom'
+import { api, dateFmt, pretty, QUADRANT_LABEL, zar, type Doc, type DocReading, type ImportResult, type OppHit, type Performance, type Semantic, type SmeHit } from '../api'
 import { useLoad } from '../hooks'
 import { PerformanceCard } from '../pages/Feedback'
 import { Badge, Modal, Panel, Spinner, useToast } from '../ui'
@@ -94,7 +95,8 @@ export function MeaningCheck({ matchId }: { matchId: string }) {
       {!s && <><p className="hint" style={{ marginTop: 0 }}>It sees no business name, no ownership and no size. It sits beside the score and never changes a score, a gate or a shortlist.</p>
         <button className="btn btn-outline" disabled={busy} onClick={run}>{busy ? 'Reading…' : 'Run the meaning check'}</button></>}
       {s && <>
-        <div className="perf-head"><b className="perf-score">{s.score}</b><span className="hint">out of 100 for meaning</span></div>
+        <div className="perf-head"><b className="perf-score">{s.score}</b><span className="hint">out of 100 for meaning</span>
+          {s.embedding_similarity !== undefined && <Badge tone="blue">Embedding similarity {s.embedding_similarity}%</Badge>}</div>
         {s.matched_themes.length > 0 && <p style={{ margin: '0 0 6px', fontSize: 13 }}><b>Matches on:</b> {s.matched_themes.join(', ')}</p>}
         {s.concerns.length > 0 && <p style={{ margin: '0 0 6px', fontSize: 13 }}><b>Worth checking:</b> {s.concerns.join(', ')}</p>}
         {s.rationale && <p style={{ margin: '0 0 6px', fontSize: 13 }}>{s.rationale}</p>}
@@ -144,6 +146,83 @@ export function ImportPanel({ onImported }: { onImported?: () => void }) {
       </div>
       {res && res.errors.length === 0 && <p className="callout green" style={{ marginBottom: 0 }}>{res.created ? `Imported ${res.created}` : `${res.rows} row${res.rows === 1 ? '' : 's'} look good`}: {res.titles.slice(0, 4).join(', ')}{res.titles.length > 4 ? '…' : ''}</p>}
       {res && res.errors.length > 0 && <div className="callout amber" style={{ marginBottom: 0 }}>{res.errors.map((e) => <div key={e.row}>Row {e.row}: {e.error}</div>)}</div>}
+    </Panel>
+  )
+}
+
+
+/** Describe it in your own words; results come back by meaning, with the rule-based position beside them. */
+export function SemanticSearch({ mode }: { mode: 'sme' | 'provider' }) {
+  const toast = useToast()
+  const [q, setQ] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [res, setRes] = useState<{ source: string; hits: (OppHit | SmeHit)[] } | null>(null)
+  async function go() {
+    if (q.trim().length < 3) return
+    setBusy(true)
+    try {
+      const r = mode === 'sme' ? await api.searchOpportunities(q) : await api.searchSmes(q)
+      setRes({ source: r.source, hits: r.results })
+    } catch (err) { toast((err as Error).message, 'error') } finally { setBusy(false) }
+  }
+  const isOpp = (h: OppHit | SmeHit): h is OppHit => 'opportunity_id' in h
+  return (
+    <Panel title={mode === 'sme' ? 'Find opportunities in your own words' : 'Find businesses in your own words'}
+      sub={mode === 'sme' ? 'Describe what you do or what you are looking for. Results are ranked by meaning, and your eligibility is shown beside each one.'
+        : 'Describe what you need. Only sector, location, years trading and capabilities are compared: no names, size or ownership.'}
+      right={res && <Badge tone={res.source === 'embeddings' ? 'purple' : 'gray'}>{res.source === 'embeddings' ? 'Semantic search' : 'Keyword search'}</Badge>}>
+      <form className="table-actions" style={{ flexWrap: 'nowrap' }} onSubmit={(e) => { e.preventDefault(); go() }}>
+        <input style={{ flex: 1, minWidth: 0, border: '1px solid #d7deea', borderRadius: 11, padding: '11px 13px' }} maxLength={500} value={q} onChange={(e) => setQ(e.target.value)}
+          placeholder={mode === 'sme' ? 'e.g. we resurface roads and fix drainage in Gauteng' : 'e.g. a team that can build and maintain rural roads'} />
+        <button className="btn btn-primary" disabled={busy || q.trim().length < 3}>{busy ? 'Searching…' : 'Search'}</button>
+      </form>
+      {res && (res.hits.length ? <div style={{ marginTop: 14 }}>{res.hits.map((h) => (
+        <div key={isOpp(h) ? h.opportunity_id : h.sme_id} className="metric-row" style={{ alignItems: 'flex-start' }}>
+          <div style={{ minWidth: 0 }}>
+            <b>{isOpp(h) ? h.title : h.name}</b>
+            <div className="hint">{pretty(h.sector)} · {h.province}{isOpp(h) ? ` · ${zar(h.contract_value)}` : ` · ${h.years_trading} yrs`}</div>
+            {isOpp(h) ? (h.match
+              ? <small>Your position: <Link to={`/app/matches/${h.match.match_id}`}>{QUADRANT_LABEL[h.match.quadrant]}</Link> (fit {h.match.fit}, readiness {h.match.readiness})</small>
+              : <small className="hint">Not matched: a mandatory requirement is unmet.</small>)
+              : <Badge tone={h.verification_status === 'verified' ? 'green' : 'amber'}>{h.verification_status === 'verified' ? 'Verified' : 'In review'}</Badge>}
+          </div>
+          <div style={{ width: 110, flex: '0 0 auto', textAlign: 'right' }}><b className="mono">{h.similarity}%</b><div className="progress" style={{ height: 6 }} aria-hidden><i style={{ width: `${h.similarity}%` }} /></div></div>
+        </div>))}
+        <p className="hint" style={{ marginBottom: 0 }}>Similarity says what to look at. It never decides who qualifies.</p></div>
+        : <p className="hint">Nothing came back.</p>)}
+    </Panel>
+  )
+}
+
+/** A buyer's own system posts opportunities with a key. The key is shown once; only a hash is kept. */
+export function IngestPanel() {
+  const toast = useToast()
+  const keys = useLoad(() => api.ingestKeys())
+  const [name, setName] = useState('')
+  const [fresh, setFresh] = useState<string | null>(null)
+  async function create() {
+    try { const k = await api.createIngestKey(name); setFresh(k.key); setName(''); keys.reload() } catch (err) { toast((err as Error).message, 'error') }
+  }
+  async function revoke(id: string) {
+    try { await api.revokeIngestKey(id); toast('Key revoked. The feed has stopped.'); keys.reload() } catch (err) { toast((err as Error).message, 'error') }
+  }
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  return (
+    <Panel title="Connect your procurement system" sub="Your system posts opportunities to the platform with an API key, and they are matched on arrival.">
+      <form className="table-actions" style={{ flexWrap: 'nowrap' }} onSubmit={(e) => { e.preventDefault(); create() }}>
+        <input style={{ flex: 1, minWidth: 0, border: '1px solid #d7deea', borderRadius: 11, padding: '11px 13px' }} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder="Name this connection, e.g. SAP export" />
+        <button className="btn btn-primary" disabled={name.trim().length < 2}>Create key</button>
+      </form>
+      {fresh && <div className="callout green" style={{ marginTop: 12 }}>
+        <b>Copy this key now. It is not shown again.</b>
+        <pre style={{ margin: '8px 0', overflowX: 'auto', fontSize: 12 }}>{fresh}</pre>
+        <pre style={{ margin: 0, overflowX: 'auto', fontSize: 12 }}>{`curl -X POST ${origin}/api/ingest/opportunities \\\n  -H "X-API-Key: ${fresh.slice(0, 10)}…" -H "Content-Type: application/json" \\\n  -d '{"opportunities":[{"title":"…","sector":"construction","province":"Gauteng",\n       "contract_value":900000,"duration_months":6,\n       "scope_items":[{"code":"CON-ROADS","value":900000}],"requirements":[]}]}'`}</pre></div>}
+      {keys.data && keys.data.length > 0 && <div className="table-wrap" style={{ marginTop: 12 }}><table>
+        <thead><tr><th>Name</th><th>Key</th><th>Last used</th><th /></tr></thead>
+        <tbody>{keys.data.map((k) => (
+          <tr key={k.id}><td>{k.name}</td><td className="mono">{k.prefix}…</td><td>{k.last_used_at ? dateFmt(k.last_used_at) : 'never'}</td>
+            <td>{k.revoked ? <Badge tone="gray">Revoked</Badge> : <button className="btn btn-outline btn-small" onClick={() => revoke(k.id)}>Revoke</button>}</td></tr>))}</tbody>
+      </table></div>}
     </Panel>
   )
 }

@@ -7,6 +7,8 @@ so a missing key or a flaky network degrades quietly.
 import base64
 import json
 import re
+import time
+import urllib.error
 import urllib.request
 
 from pydantic import BaseModel, ValidationError
@@ -65,7 +67,14 @@ def _anthropic(prompt: str) -> str:
 
 def _raw(prompt: str, file: tuple[bytes, str] | None = None, as_json: bool = False) -> str | None:
     if settings.llm_provider == "gemini" and settings.gemini_api_key:
-        return _gemini(prompt, file, as_json)
+        try:
+            return _gemini(prompt, file, as_json)
+        except Exception as e:  # noqa: BLE001
+            permanent = isinstance(e, urllib.error.HTTPError) and e.code < 500 and e.code != 429
+            if permanent:
+                raise
+            time.sleep(1.0)  # a slow or briefly overloaded reply: one more try, then fall back
+            return _gemini(prompt, file, as_json)
     if file:
         return None  # only Gemini reads files here
     if settings.llm_provider == "anthropic" and settings.anthropic_api_key:

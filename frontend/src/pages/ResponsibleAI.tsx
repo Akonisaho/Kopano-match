@@ -49,6 +49,7 @@ export default function ResponsibleAI() {
             <div className="rai-stats">
               <div><b>{e.scenarios.passed}/{e.scenarios.total}</b><span>planted scenarios behave as promised</span></div>
               <div><b>{e.determinism.identical ? 'Identical' : 'Differs'}</b><span>result on {e.determinism.runs} runs (fingerprint {e.determinism.fingerprint})</span></div>
+              <div><b>{(e.robustness.top3_overlap * 100).toFixed(0)}%</b><span>of the top three kept when inputs move ({e.robustness.perturbation})</span></div>
               <div><b>{e.fairness.scores_changed_by_ownership}/{e.fairness.counterfactual_pairs}</b><span>scores changed when ownership was flipped</span></div>
             </div>
 

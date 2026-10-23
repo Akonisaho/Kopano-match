@@ -232,3 +232,7 @@ class FeedbackResponseIn(Strict):
 class FeedbackResolveIn(Strict):
     decision: Literal["uphold", "remove"]
     note: str = Field(min_length=3, max_length=500)
+
+
+class SearchIn(Strict):
+    query: str = Field(min_length=3, max_length=500)

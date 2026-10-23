@@ -197,3 +197,20 @@ scenario checks, ranking quality against baselines, determinism, a fairness audi
 keys are in `.env`. Run the API for browser testing with `EMAIL_PROVIDER=log` so demo accounts never
 email a real address.
 
+## 13. Semantic search and the procurement-system feed
+
+**Semantic search.** *Opportunities* (business) and *Verified SMEs* (buyer) each have a search box.
+Type what you do or need in your own words. Gemini embeddings (`GEMINI`'s `gemini-embedding-001`,
+set by `EMBEDDING_MODEL`) rank the results by meaning. A business sees its own rule-based position
+beside each result. Similarity says what to look at, never who qualifies, and it falls back to keyword
+overlap when the service is unavailable. The score is stretched for display and is not a probability.
+On a match, the meaning check also shows an embedding similarity.
+
+**Procurement-system feed.** *Post opportunity*, then *Connect your procurement system*. Create a key,
+copy it once, and have your system post to `POST /ingest/opportunities` with the header `X-API-Key`.
+Up to 50 opportunities a call, matched on arrival. Only a hash of the key is stored, a key belongs to
+one organisation, and *Revoke* stops the feed at once. Every call is audited.
+
+**Robustness.** The evaluation also nudges turnover and years trading and reports how stable the
+shortlist stays. CI fails it if the top three overlap drops under 80%.
+

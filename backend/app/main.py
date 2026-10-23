@@ -24,6 +24,9 @@ if settings.environment != "dev" and (
         f"JWT_SECRET must be set to {MIN_JWT_SECRET_BYTES}+ random bytes outside dev"
     )
 
+if settings.environment != "dev" and settings.scanner_provider == "mock":
+    raise RuntimeError("SCANNER_PROVIDER must be a real scanner (clamav) outside dev")
+
 if settings.environment != "dev" and not settings.mfa_encryption_key:
     raise RuntimeError("MFA_ENCRYPTION_KEY must be set outside dev")
 

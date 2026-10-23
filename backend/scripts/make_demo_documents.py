@@ -148,6 +148,11 @@ def main() -> None:
     ap.add_argument(
         "--out", default=None, help="output folder (default demo-documents/ at the repo root)"
     )
+    ap.add_argument(
+        "--virus-test",
+        action="store_true",
+        help="also write virus-test.pdf, the standard harmless antivirus test file",
+    )
     args = ap.parse_args()
     types = [t.strip().upper() for t in args.types.split(",") if t.strip()]
     expired = {t.strip().upper() for t in args.expired.split(",") if t.strip()}
@@ -156,6 +161,14 @@ def main() -> None:
         raise SystemExit(f"Unknown types {bad}. Choose from {list(CATALOGUE)}")
     root = Path(args.out) if args.out else Path(__file__).resolve().parents[2] / "demo-documents"
     today = date.today()
+    if args.virus_test:
+        root.mkdir(parents=True, exist_ok=True)
+        # The industry-standard harmless test string, built in two parts. Your own antivirus may
+        # remove this file the moment it is written: that is the test string doing its job.
+        (root / "virus-test.pdf").write_bytes(
+            rb"X5O!P%@AP[4\PZX54(P^)7CC)7}$" + b"EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+        )
+        print(f"virus-test.pdf written to {root}: upload it to see the security scan reject it")
     for company in args.companies:
         folder = root / re.sub(r"[^A-Za-z0-9 _-]", "", company).strip().replace(" ", "_")
         folder.mkdir(parents=True, exist_ok=True)

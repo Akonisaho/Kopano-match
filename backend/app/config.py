@@ -26,7 +26,10 @@ class Settings(BaseSettings):
     identity_provider: str = "mock"
     registry_provider: str = "mock"
     tax_provider: str = "mock"
-    scanner_provider: str = "mock"
+    scanner_provider: str = "mock"  # "clamav" for real scanning; required outside dev
+    clamav_host: str = "127.0.0.1"
+    clamav_port: int = 33100  # our compose maps clamd to this host port
+    clamav_timeout: float = 20.0
 
     # Email: "log" keeps messages in memory; "brevo" sends them (needs a verified sender)
     email_provider: str = "log"

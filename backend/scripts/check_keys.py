@@ -16,6 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.adapters import clamav  # noqa: E402
 from app.adapters.email import BrevoEmailSender  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.llm import client as llm  # noqa: E402
@@ -126,12 +127,31 @@ def check_brevo(send_to: str | None) -> bool | None:
     return True
 
 
+def check_scanner() -> bool | None:
+    if settings.scanner_provider != "clamav":
+        print(
+            "Scanner  mock        Only the standard test file is caught. For real scanning: "
+            "docker compose --profile scan up -d clamav, then SCANNER_PROVIDER=clamav."
+        )
+        return None
+    if clamav.ping():
+        print(
+            f"Scanner  PASS        ClamAV answered at {settings.clamav_host}:{settings.clamav_port}."
+        )
+        return True
+    print(
+        f"Scanner  FAIL        ClamAV is not answering at {settings.clamav_host}:{settings.clamav_port}. "
+        "Start it with: docker compose --profile scan up -d clamav (first start takes a few minutes)."
+    )
+    return False
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--send-test", metavar="EMAIL", help="send one real test email to this address")
     args = ap.parse_args()
     print(f"Environment: {settings.environment}\n")
-    results = [check_gemini(), check_brevo(args.send_test)]
+    results = [check_gemini(), check_brevo(args.send_test), check_scanner()]
     if settings.environment == "dev" and not settings.mfa_encryption_key:
         print(
             "MFA key  dev default  Fine locally. Outside dev, set MFA_ENCRYPTION_KEY (see docs/KEYS_AND_EMAIL.md)."

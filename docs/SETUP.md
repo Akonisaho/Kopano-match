@@ -95,3 +95,44 @@ a similar app, enter the code, and save the eight recovery codes shown once.
 | Gemini or Brevo not working | `python scripts/check_keys.py` names the problem |
 | Emails land in spam | Normal for a new sender. Mark them as not spam, or authenticate your sending domain |
 | Port in use | Close old windows. The database uses 55432, the API 8000, the web app 5173 |
+
+## 9. Malware scanning (ClamAV)
+
+Every uploaded file is scanned before it is stored. The engine is **ClamAV**, a free open-source
+antivirus that runs as its own service. It needs no key.
+
+```powershell
+.\scripts\dev.ps1 -Empty -Scan        # starts ClamAV and points the API at it
+# or by hand:
+docker compose --profile scan up -d clamav
+$env:SCANNER_PROVIDER = "clamav"        # then start the API
+```
+
+The first start downloads the virus definitions and can take a few minutes. It uses roughly 1 to 2 GB
+of memory. Check it: `python scripts/check_keys.py` should print `Scanner PASS`.
+
+- **If the scanner is down, uploads are refused** with a clear "try again" message and nothing is
+  stored. A file is never accepted unscanned.
+- Without `SCANNER_PROVIDER=clamav`, local runs use a mock that only catches the standard test file.
+  Outside development the app refuses to start with the mock.
+- **See it work in a demo:** `python scripts/make_demo_documents.py "Acme" --virus-test` writes
+  `virus-test.pdf`, the industry-standard harmless antivirus test file. Upload it and the scan
+  rejects it. Your own antivirus may delete the file the moment it is written, which is the same
+  test string doing its job. Allow it for the demo folder, or skip this moment.
+
+## 10. Test everything
+
+With the API and web app running and the demo built, one command checks the whole system:
+
+```powershell
+cd backend
+python scripts/smoke_test.py --email you@gmail.com --admin-email you@yourdomain.co.za --admin-password "..."
+python scripts/check_keys.py          # Gemini, Brevo and the scanner
+python -m pytest -q                   # the full automated suite (needs the planted seed)
+```
+
+The smoke test prints one PASS or FAIL per check: sign-in and roles, matching, the quadrant chart
+data, consortium, dossier, Unlock Map, Unlock Plan, notifications, other SMEs being blocked from
+your data, throttling, uploads, the virus test file, two-step setup and erasure. It creates one
+throwaway account (erased at the end, so one welcome email arrives) and asks for one password
+reset for a demo SME, so one reset email may arrive.

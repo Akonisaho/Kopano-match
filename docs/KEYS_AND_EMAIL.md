@@ -79,3 +79,14 @@ what to do:
 | Gemini FAIL 429 | Out of quota or rate-limited. Wait, or check the plan |
 | Email FAIL 401 | The Brevo API key is not valid |
 | Sender FAIL | `EMAIL_FROM` is not a verified sender. Verify it in Brevo |
+
+## Malware scanning needs no key
+
+ClamAV runs locally in Docker: `docker compose --profile scan up -d clamav`, then set
+`SCANNER_PROVIDER=clamav` in `backend/.env`. Settings (all optional): `CLAMAV_HOST` (default
+127.0.0.1) and `CLAMAV_PORT` (default 33100, which our compose file maps to ClamAV's own 3310).
+`python scripts/check_keys.py` reports whether it answers.
+
+ClamAV is GPL-licensed software. It runs as a separate service and is not linked into this
+application, but confirm the licence position with whoever advises you before distributing the
+container.

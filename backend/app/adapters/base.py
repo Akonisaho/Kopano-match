@@ -28,6 +28,10 @@ class ScanResult:
     source_label: str
 
 
+class ScannerUnavailable(RuntimeError):
+    """The scanner could not give an answer. Callers must treat this as 'not scanned', never as clean."""
+
+
 class MalwareScanner(ABC):
     @abstractmethod
     def scan(self, data: bytes) -> ScanResult:

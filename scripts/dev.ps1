@@ -3,11 +3,12 @@
 
     .\scripts\dev.ps1            # planted demo data (for tests and quick looks)
     .\scripts\dev.ps1 -Empty     # clean start: one admin account, build your own data
+    .\scripts\dev.ps1 -Scan      # also start ClamAV malware scanning (first start takes a few minutes)
     .\scripts\dev.ps1 -DryRun    # print what it would do
 
   Needs Docker Desktop, Python 3.12 and Node 20+. Opens the API and the web app in two windows.
 #>
-param([switch]$Empty, [switch]$DryRun)
+param([switch]$Empty, [switch]$DryRun, [switch]$Scan)
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
@@ -29,6 +30,14 @@ Step "Start the database (Docker)" {
         Start-Sleep -Seconds 1
     }
     throw "The database did not become ready. Is Docker Desktop running?"
+}
+
+Step "Start malware scanning (ClamAV)" {
+    if (-not $Scan) { Write-Host "    skipped (add -Scan to enable; uploads use the mock scanner)" -ForegroundColor DarkGray; return }
+    Set-Location $root
+    docker compose --profile scan up -d clamav | Out-Null
+    $env:SCANNER_PROVIDER = "clamav"
+    Write-Host "    ClamAV is downloading virus definitions on first start; uploads fail safely until it is ready." -ForegroundColor Yellow
 }
 
 Step "Set up the Python environment" {

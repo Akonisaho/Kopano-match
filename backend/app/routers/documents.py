@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import models as m
+from ..adapters.base import ScannerUnavailable
 from ..adapters.mock import malware_scanner
 from ..audit import write_audit
 from ..auth import current_user, own_org_or_404, require_role
@@ -78,9 +79,15 @@ async def upload(
     data = await file.read(settings.max_upload_bytes + 1)
     if len(data) > settings.max_upload_bytes:
         raise HTTPException(413, "File exceeds the size limit")
-    if not data.startswith(magics):
-        raise HTTPException(415, "File content does not match its type")
-    scan = malware_scanner().scan(data)
+    try:
+        scan = malware_scanner().scan(data)
+    except ScannerUnavailable:
+        # Fail closed: an unscanned file is never stored
+        write_audit(db, user.id, "document_scan_unavailable", "document", None)
+        db.commit()
+        raise HTTPException(
+            503, "The security scan is not available right now. Try again in a few minutes."
+        ) from None
     if not scan.clean:
         write_audit(
             db,
@@ -92,6 +99,9 @@ async def upload(
         )
         db.commit()
         raise HTTPException(422, "This file was rejected by the security scan")
+    # The scanner sees everything that passed the cheap checks; the type check comes last
+    if not data.startswith(magics):
+        raise HTTPException(415, "File content does not match its type")
 
     digest = hashlib.sha256(data).hexdigest()
     reused_elsewhere = db.scalar(

@@ -7,6 +7,7 @@ dated remediation plans, capacity-risk flags and consortium assembly. Pilot buil
 ## Run it
 
 Fastest: `.\scripts\dev.ps1 -Empty`, then `python scripts/build_demo.py --email you@gmail.com` from `backend/`.
+Real malware scanning: add `-Scan`. Check the whole system: `python scripts/smoke_test.py` (see SETUP.md).
 Step by step: [docs/SETUP.md](docs/SETUP.md). Keys and email: [docs/KEYS_AND_EMAIL.md](docs/KEYS_AND_EMAIL.md).
 
 Manually:

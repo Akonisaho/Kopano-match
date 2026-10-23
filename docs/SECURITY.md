@@ -115,3 +115,20 @@ endpoint does slightly more work for a registered email than an unknown one, so 
 could measure a timing difference; the response itself is identical. Existing access tokens stay
 valid until they expire (30 minutes) after a password reset. Outside development the app refuses
 to start without `MFA_ENCRYPTION_KEY`.
+
+## Malware scanning
+
+| Property | State |
+|---|---|
+| Engine | ClamAV, run as a separate service (`docker compose --profile scan`), spoken to over its network protocol. Local runs default to a mock that only catches the standard test file |
+| When it runs | After the filename, type and size checks and before anything is stored or its type header is trusted |
+| If it cannot answer | The upload is refused (HTTP 503) and nothing is stored. An error or an odd answer is never treated as clean |
+| Outside development | The app refuses to start with the mock scanner |
+| Proven by | Tests against a stand-in ClamAV server (run in CI), and tests against a real ClamAV container when one is running, including the standard test file being rejected and a clean certificate being accepted |
+
+Honest limits: antivirus is signature-based and does not catch everything, so it is one layer, not
+a guarantee. Uploads are limited to PDF, PNG and JPG with content checks, which narrows the risk.
+ClamAV's test signature matches only a file that is the test string, so test files carry no
+header. The real-ClamAV tests do not run in CI because the container is large; the protocol tests
+do. Definitions update inside the container, so a production deployment needs a plan for keeping it
+running and current.

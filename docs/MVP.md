@@ -24,7 +24,7 @@ model.
 | Registry, tax, identity checks | Mock adapters | Live providers behind the same interfaces |
 | Database schema | Created by `create_all`, reseeded | Migrations (Alembic), so real data survives changes |
 | Hosting | Local only | Dockerfile, deployment in Azure South Africa North, HTTPS, secrets in a vault |
-| Files | Local disk, unencrypted | Blob storage, encryption at rest, malware scan |
+| Files | Local disk, unencrypted. Uploads are scanned by ClamAV when it is running, and refused if it is down | Blob storage, encryption at rest, scanning always on and monitored in production |
 | Sign-in | Password, optional authenticator-app step with recovery codes, single-use password reset, login throttle | Email verification at sign-up, MFA required for admins and providers, a shared store for the throttle |
 | Erasure and retention | Anonymises the person and deletes their uploaded files | A retention job and a documented schedule |
 | Notifications | In-app bell plus email (Brevo) for welcome, shortlist, application and expiry reminders | Delivery tracking, user preferences, review-outcome notices, a scheduled reminder job in production |

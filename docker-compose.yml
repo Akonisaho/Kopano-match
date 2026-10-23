@@ -9,5 +9,20 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./backend/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+  # Malware scanning. Opt in with:  docker compose --profile scan up -d clamav
+  # First start downloads the virus definitions and can take a few minutes.
+  clamav:
+    image: clamav/clamav:stable
+    profiles: ["scan"]
+    ports: ['33100:3310']
+    volumes:
+      - clamdb:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 240s
 volumes:
   pgdata:
+  clamdb:

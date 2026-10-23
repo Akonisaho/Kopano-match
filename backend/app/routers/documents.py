@@ -23,7 +23,7 @@ from ..db import get_db
 from ..engine.taxonomy import CAPABILITIES, COMPLIANCE_CATALOGUE, PROVINCES, SECTORS
 from ..llm import client, prompts
 from ..schemas import Strict
-from ..services import doc_status
+from ..services import doc_status, rematch_for_sme
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -156,6 +156,8 @@ async def upload(
         doc.id,
         new={"type": document_type, "result": result},
     )
+    db.commit()
+    rematch_for_sme(db, user.organisation_id)  # the new document counts straight away
     db.commit()
     return {**_view(doc), "verification": result}
 
@@ -301,5 +303,7 @@ def set_expiry(
         old={"expiry": str(old)},
         new={"expiry": str(body.expiry_date)},
     )
+    db.commit()
+    rematch_for_sme(db, user.organisation_id)
     db.commit()
     return _view(doc)

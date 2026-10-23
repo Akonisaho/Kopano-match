@@ -154,12 +154,11 @@ function UnlockPlan({ gaps }: { gaps: (Gap & { blocks: string[] })[] }) {
         </div>
         <div>
           {!plan ? <div className="empty">{picked.length ? 'Working it out…' : 'Tick at least one document to see what it unlocks.'}</div> : <>
-            <div className="metric-grid" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 12, opacity: busy ? 0.6 : 1 }}>
-              <div className="metric"><span>Award-ready opportunities</span><b>{plan.before.award_ready} → <span style={{ color: '#7c3aed' }}>{plan.after.award_ready}</span></b><small>after these documents</small></div>
-              <div className="metric"><span>Contract value you can be awarded</span><b style={{ fontSize: 22 }}>{zar(plan.before.value)} → <span style={{ color: '#7c3aed' }}>{zar(plan.after.value)}</span></b><small>{gain > 0 ? `+${zar(gain)}` : 'no change'}</small></div>
+            <div className="delta" style={{ opacity: busy ? 0.6 : 1 }}>
+              <small>Contract value you can be awarded</small>
+              <div className="delta-row"><span>{zar(plan.before.value)}</span><i>→</i><b>{zar(plan.after.value)}</b>{gain > 0 && <em>+{zar(gain)}</em>}</div>
+              <div className="delta-sub">{plan.before.award_ready} → {plan.after.award_ready} award-ready · {plan.total_days} days · {plan.total_cost_zar ? zar(plan.total_cost_zar) : 'no cost'}</div>
             </div>
-            <p style={{ margin: '0 0 10px', fontSize: 13, color: '#475467' }}>
-              <b>{plan.total_days} days and {zar(plan.total_cost_zar)}</b> in total. The documents are obtained at the same time, so the wait is the longest one.</p>
             {plan.routes.length > 0 && plan.routes[0].gain_value > 0 && (
               <div className="callout purple" style={{ marginTop: 0, marginBottom: 12, background: '#faf5ff', color: '#4c1d95' }}>
                 <b>Best first move: {plan.routes[0].label}.</b> On its own it opens {zar(plan.routes[0].gain_value)} of contracts in about {plan.routes[0].days} days
@@ -422,7 +421,7 @@ export function SmeOpportunities() {
               <tr key={o.opportunity_id}>
                 <td><b>{o.title}</b><br /><small>{pretty(o.sector)} · {o.province}</small></td>
                 <td><Badge tone="purple">{KIND_LABEL[o.kind]}</Badge></td>
-                <td>{o.provider}<br /><Badge tone={o.provider_status === 'verified' ? 'green' : 'amber'}>{o.provider_status === 'verified' ? 'Verified provider' : 'In review'}</Badge></td>
+                <td>{o.provider}<br />{o.provider_status === 'verified' && <Badge tone="green">Verified provider</Badge>}</td>
                 <td>{dateFmt(o.deadline)}{left !== null && left <= 14 && left >= 0 && <><br /><small style={{ color: '#b45309' }}>{left} days left</small></>}</td>
                 <td>{zar(o.contract_value)}</td>
                 {o.match ? <>

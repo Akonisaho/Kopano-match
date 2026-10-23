@@ -47,9 +47,9 @@ SMES = [
         docs={"TCS": "ok", "BBBEE": "ok", "COID": "ok", "CIDB": "ok"},
     ),
     dict(
-        tag="thabo",
-        name="Thabo Civils",
-        owner="Thabo Nkosi",
+        tag="isizwe",
+        name="Isizwe Civil Works",
+        owner="Lerato Mokoena",
         sector="construction",
         province="Gauteng",
         turnover=6_000_000,
@@ -455,16 +455,16 @@ def main():
     by, roads = opp_ids["Provincial roads rehabilitation"]
     _, ranked = api.call("GET", f"/opportunities/{roads}/matches", ptoken[by])
     for row in ranked:
-        if row["sme_name"] in ("Masego Infrastructure", "Thabo Civils"):
+        if row["sme_name"] in ("Masego Infrastructure", "Isizwe Civil Works"):
             api.call("POST", f"/matches/{row['match_id']}/shortlist", ptoken[by])
         if row["sme_name"] in ("Masego Infrastructure", "Nomsa Builders"):
             api.call("POST", f"/applications/{row['match_id']}", stokens[row["sme_name"]])
 
     print("Recording awards and inviting a consortium ...")
-    # A split award on the roads tender. Thabo still had open document gaps when awarded, which
+    # A split award on the roads tender. Isizwe still had open document gaps when awarded, which
     # is exactly the case a strict "must hold every document" filter would have rejected.
     by_name = {row["sme_name"]: row["match_id"] for row in ranked}
-    for name, value in (("Masego Infrastructure", 2_500_000), ("Thabo Civils", 1_700_000)):
+    for name, value in (("Masego Infrastructure", 2_500_000), ("Isizwe Civil Works", 1_700_000)):
         status, body = api.call(
             "POST", f"/applications/{by_name[name]}/award", ptoken[by], body={"value": value}
         )
@@ -477,7 +477,7 @@ def main():
             [5, 5, 4, 5, 4, 5],
             "Delivered the first phase ahead of schedule and the paperwork was complete.",
         ),
-        "Thabo Civils": (
+        "Isizwe Civil Works": (
             [4, 3, 4, 4, 3, 4],
             "Good quality work, but two milestones slipped by about a week.",
         ),
@@ -501,7 +501,7 @@ def main():
         stokens["Masego Infrastructure"],
         body={"text": "Thank you. The second phase is already scheduled with the same crew."},
     )
-    print("  Thabo Civils has not answered its review yet: respond or dispute it live.")
+    print("  Isizwe Civil Works has not answered its review yet: respond or dispute it live.")
     by2, agri = opp_ids["Integrated agri-hub build"]
     status, inv = api.call("POST", f"/opportunities/{agri}/consortium/invite", ptoken[by2])
     if status != 201:

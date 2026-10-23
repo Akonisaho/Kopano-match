@@ -81,10 +81,18 @@ export function Metric({ label, value, note, tone }: { label: string; value: Rea
   )
 }
 
+/** The first sentence, cut short. Context belongs in a glance, not a paragraph. */
+export function brief(text: string, max = 90): string {
+  const first = text.split(/(?<=[.!?])\s/)[0]
+  if (first.length <= max) return first
+  const cut = first.slice(0, max).replace(/\s+\S*$/, '')
+  return `${cut}…`
+}
+
 export function Panel({ title, sub, right, children }: { title?: ReactNode; sub?: string; right?: ReactNode; children: ReactNode }) {
   return (
     <section className="panel">
-      {(title || right) && <div className="panel-head"><div>{title && <h3>{title}</h3>}{sub && <p>{sub}</p>}</div>{right}</div>}
+      {(title || right) && <div className="panel-head"><div>{title && <h3>{title}</h3>}{sub && <p title={sub}>{brief(sub)}</p>}</div>{right}</div>}
       {children}
     </section>
   )
@@ -93,7 +101,7 @@ export function Panel({ title, sub, right, children }: { title?: ReactNode; sub?
 export function Welcome({ eyebrow, title, text, action, hero }: { eyebrow?: string; title: string; text?: string; action?: ReactNode; hero?: boolean }) {
   return (
     <div className={`welcome${hero ? ' welcome-hero' : ''}`}>
-      <div>{eyebrow && <span className="eyebrow dark">{eyebrow}</span>}<h1>{title}</h1>{text && <p>{text}</p>}</div>
+      <div>{eyebrow && <span className="eyebrow dark">{eyebrow}</span>}<h1>{title}</h1>{text && <p title={text}>{brief(text, 110)}</p>}</div>
       {action}
     </div>
   )

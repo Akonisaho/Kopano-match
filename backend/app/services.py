@@ -166,6 +166,17 @@ def run_matching(db: Session, opportunity_id: uuid.UUID) -> list[m.Match]:
     return saved
 
 
+def rematch_for_sme(db: Session, org_id: uuid.UUID) -> int:
+    """Re-score every opportunity this business already has a match on, so a new or renewed
+    document shows in its numbers at once. Shortlist and award status are kept. The caller commits."""
+    ids = list(
+        db.scalars(select(m.Match.opportunity_id).where(m.Match.sme_id == org_id).distinct())
+    )
+    for oid in ids:
+        run_matching(db, oid)
+    return len(ids)
+
+
 def blockers_for(db: Session, org_id: uuid.UUID) -> dict[uuid.UUID, list[str]]:
     """Why an SME is not matched to each open opportunity it fails the gate for."""
     from .engine.gate import run_gate

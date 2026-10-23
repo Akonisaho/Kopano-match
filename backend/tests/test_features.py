@@ -516,3 +516,25 @@ def test_readiness_passport_is_shared_by_choice_and_exposes_only_safe_facts():
     assert client.get("/passport/not-a-real-token").status_code == 404
     actions = [a["action"] for a in client.get("/me/audit", headers=sme).json()]
     assert {"passport_enabled", "passport_rotated", "passport_disabled"} <= set(actions)
+
+
+def test_uploading_a_missing_document_rescores_the_business_at_once():
+    sme = login("sme-001@sme.demo")  # planted: high fit, missing documents
+    before = client.get("/smes/me/dashboard", headers=sme).json()
+    gaps = before["open_gaps"]
+    if not gaps:  # an earlier run already closed them
+        return
+    code = gaps[0]["credential"]
+    ready_before = max(m["readiness"] for m in before["matches"])
+    up = client.post(
+        "/documents",
+        headers=sme,
+        data={"document_type": code, "expiry_date": str(date.today() + timedelta(days=300))},
+        files={"file": (f"{code}.pdf", PDF + uuid.uuid4().bytes, "application/pdf")},
+    )
+    assert up.status_code == 201, up.text
+    after = client.get("/smes/me/dashboard", headers=sme).json()
+    assert code not in [
+        g["credential"] for g in after["open_gaps"]
+    ]  # the gap closed without any rerun
+    assert max(m["readiness"] for m in after["matches"]) >= ready_before

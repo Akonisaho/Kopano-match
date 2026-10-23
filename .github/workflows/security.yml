@@ -1,0 +1,76 @@
+name: security
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule: [{ cron: '0 3 * * 1' }]
+permissions:
+  contents: read
+jobs:
+  # CodeQL is free on public repos only. Remove this job if the repository stays private.
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/analyze@v3
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install pip-audit && pip-audit -r backend/requirements.txt
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm audit --audit-level=moderate --prefix frontend
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install bandit && bandit -r backend/app backend/seed.py -ll
+  # Software bill of materials (CycloneDX 1.6) for every build, kept as a downloadable artifact.
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Backend SBOM from a runtime-only environment
+        run: |
+          python -m venv /tmp/rt && /tmp/rt/bin/pip install -r backend/requirements.txt
+          python -m venv /tmp/tool && /tmp/tool/bin/pip install cyclonedx-bom
+          mkdir -p sbom
+          /tmp/tool/bin/cyclonedx-py environment /tmp/rt --mc-type application \
+            --of JSON --sv 1.6 -o sbom/backend.cdx.json
+      - name: Frontend SBOM (production dependencies only)
+        working-directory: frontend
+        run: |
+          npm ci
+          npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON \
+            --spec-version 1.6 --output-file ../sbom/frontend.cdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom/
+          retention-days: 90

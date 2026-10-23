@@ -21,7 +21,7 @@ Landing page. Let the hero play once: a business is blocked, two documents are n
 and R4 200 000 unlocks. *"Small businesses lose contracts over paperwork nobody tells them about. We tell them, and we price it."*
 
 ## 0:20 to 0:40. Try before you sign up
-Press **Browse open opportunities**. Open the roads tender. Tick two capabilities and a document in the checker; the verdict
+Press **Browse open opportunities**. Tap the type chips: *Procurement, Grant, Funding, Investment, Business support*, each with its count. *"Every kind of opportunity in one place."* Open the roads tender. Tick two capabilities and a document in the checker; the verdict
 moves as you tick. Open **How the platform decided**. *"Anyone can check their fit before they register. Nothing is stored. We only ask for an account when they want to act."*
 
 ## 0:40 to 1:30. The business: unlock (`demo+isizwe@…`)

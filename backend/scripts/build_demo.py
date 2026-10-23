@@ -178,6 +178,7 @@ PROVIDERS = [
     dict(
         tag="funder", role="funder", name="Growth Catalyst Fund", owner="Funding Programme Manager"
     ),
+    dict(tag="support", role="support", name="Enterprise Africa", owner="Programme Director"),
 ]
 
 
@@ -266,6 +267,101 @@ OPPORTUNITIES = [
                 req("ownership", {"flag": "youth"}, True, 10),
                 req("min_years", {"years": 1}),
                 req("compliance_doc", {"doc": "TCS"}, True, 10),
+            ],
+        ),
+    ),
+    dict(
+        by="funder",
+        body=dict(
+            kind="funding",
+            title="Working capital facility",
+            sector="construction",
+            province="Gauteng",
+            description="Revolving working capital for contractors with a signed order. Draw down against invoices, repay on payment.",
+            deadline=str(TODAY + timedelta(days=21)),
+            contract_value=1_500_000,
+            duration_months=24,
+            payment_terms_days=30,
+            scope_items=[
+                {"code": "CON-ROADS", "value": 750_000},
+                {"code": "CON-CIVIL", "value": 750_000},
+            ],
+            transformation_gap=[],
+            requirements=[
+                req("min_turnover", {"amount": 2_000_000}, True, 10),
+                req("min_years", {"years": 3}),
+                req("compliance_doc", {"doc": "TCS"}, True, 10),
+            ],
+        ),
+    ),
+    dict(
+        by="funder",
+        body=dict(
+            kind="investor",
+            title="Growth-stage equity round",
+            sector="ict",
+            province="Western Cape",
+            description="Equity for software and infrastructure businesses with proven recurring revenue and a clear path to scale.",
+            deadline=str(TODAY + timedelta(days=40)),
+            contract_value=5_000_000,
+            duration_months=60,
+            payment_terms_days=30,
+            scope_items=[
+                {"code": "ICT-DEV", "value": 3_000_000},
+                {"code": "ICT-NET", "value": 2_000_000},
+            ],
+            transformation_gap=[],
+            requirements=[
+                req("capability", {"code": "ICT-DEV"}, True, 10),
+                req("min_turnover", {"amount": 3_000_000}, True, 10),
+                req("min_years", {"years": 3}),
+            ],
+        ),
+    ),
+    dict(
+        by="support",
+        body=dict(
+            kind="support",
+            title="Supplier readiness accelerator",
+            sector="services",
+            province="Gauteng",
+            description="Six months of mentoring, tax and compliance clinics, and introductions to corporate buyers. Free for accepted businesses.",
+            deadline=str(TODAY + timedelta(days=12)),
+            contract_value=400_000,
+            duration_months=6,
+            payment_terms_days=30,
+            scope_items=[
+                {"code": c, "value": 50_000}
+                for c in ("CON-ROADS", "ICT-DEV", "SVC-CATER", "MFG-FAB")
+            ],
+            transformation_gap=["youth"],
+            requirements=[
+                req("min_years", {"years": 1}),
+                req("compliance_doc", {"doc": "TCS"}, False, 5),
+            ],
+        ),
+    ),
+    dict(
+        by="buyer",
+        body=dict(
+            kind="procurement",
+            title="Managed IT services contract",
+            sector="ict",
+            province="Gauteng",
+            description="Three years of helpdesk, endpoint support and network monitoring for a regional office.",
+            deadline=str(TODAY + timedelta(days=25)),
+            contract_value=1_800_000,
+            duration_months=36,
+            payment_terms_days=30,
+            scope_items=[
+                {"code": "ICT-SUP", "value": 1_000_000},
+                {"code": "ICT-NET", "value": 800_000},
+            ],
+            transformation_gap=["black_women"],
+            requirements=[
+                req("capability", {"code": "ICT-SUP"}, True, 10),
+                req("compliance_doc", {"doc": "TCS"}, True, 10),
+                req("compliance_doc", {"doc": "BBBEE"}, True, 10),
             ],
         ),
     ),

@@ -343,15 +343,16 @@ export const PROVIDER_ROLES: Role[] = ['corporate', 'funder', 'support']
 export const isProvider = (r: Role) => PROVIDER_ROLES.includes(r)
 
 export const zar = (n: number) => 'R' + Math.round(n).toLocaleString('en-ZA').replace(/ /g, ' ')
+const ACRONYM: Record<string, string> = { ict: 'ICT', bbbee: 'B-BBEE', csd: 'CSD', cidb: 'CIDB' }
 export const pretty = (s: string) =>
-  s.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase()).replace(/Ict/g, 'ICT').replace(/Bbbee/g, 'B-BBEE')
+  s.split('_').map((w, k) => ACRONYM[w.toLowerCase()] ?? (k === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' ')
 export const dateFmt = (s: string | null) =>
   s ? new Date(s).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 export const daysUntil = (s: string | null) =>
   s ? Math.ceil((new Date(s).getTime() - Date.now()) / 86400000) : null
 
 export const KIND_LABEL: Record<Kind, string> = {
-  procurement: 'Procurement', grant: 'Grant', funding: 'Funding', investor: 'Investor', support: 'Business support',
+  procurement: 'Procurement', grant: 'Grant', funding: 'Funding', investor: 'Investment', support: 'Business support',
 }
 export const QUADRANT_LABEL: Record<Quadrant, string> = {
   award_now: 'Award ready', coachable: 'Coachable', ready_weak_fit: 'Ready, weak fit', develop: 'Develop',

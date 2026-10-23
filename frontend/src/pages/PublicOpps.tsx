@@ -34,28 +34,55 @@ export function OppCard({ o }: { o: PublicCard }) {
   )
 }
 
+const KIND_ORDER: Kind[] = ['procurement', 'grant', 'funding', 'investor', 'support']
+type Sort = 'closing' | 'value'
+
 export function PublicOpportunities() {
   const gate = useGate()
   const list = useLoad(() => api.publicOpportunities())
   const [kind, setKind] = useState<Kind | 'all'>('all')
   const [q, setQ] = useState('')
-  const shown = useMemo(() => (list.data ?? []).filter((o) =>
-    (kind === 'all' || o.kind === kind) && `${o.title} ${o.provider} ${o.sector} ${o.province}`.toLowerCase().includes(q.toLowerCase())), [list.data, kind, q])
-  const kinds = Array.from(new Set((list.data ?? []).map((o) => o.kind)))
+  const [sector, setSector] = useState('')
+  const [province, setProvince] = useState('')
+  const [soon, setSoon] = useState(false)
+  const [sort, setSort] = useState<Sort>('closing')
+  const all = list.data ?? []
+  const count = (k: Kind) => all.filter((o) => o.kind === k).length
+  const sectors = Array.from(new Set(all.map((o) => o.sector))).sort()
+  const provinces = Array.from(new Set(all.map((o) => o.province))).sort()
+  const shown = useMemo(() => {
+    const rows = all.filter((o) =>
+      (kind === 'all' || o.kind === kind) && (!sector || o.sector === sector) && (!province || o.province === province)
+      && (!soon || (daysUntil(o.deadline) ?? 999) <= 14)
+      && `${o.title} ${o.provider} ${o.sector} ${o.province}`.toLowerCase().includes(q.toLowerCase()))
+    const far = '9999-12-31'
+    return rows.sort((a, b) => sort === 'value' ? b.contract_value - a.contract_value : (a.deadline ?? far).localeCompare(b.deadline ?? far))
+  }, [all, kind, q, sector, province, soon, sort])
+  const filtered = kind !== 'all' || sector || province || soon || q
   return (
     <div className="lx lx-page">
       <LxTop onLogin={() => gate.open('login')} onSignup={() => gate.open('signup')} />
       <main className="lx-wrap">
         <span className="lx-eyebrow">Open to everyone</span>
         <h1 className="lx-h1">Opportunities you can check <em>before you sign up.</em></h1>
-        <p className="lx-lead">Browse what is on offer, then see in seconds how the platform would judge your business.</p>
+        <p className="lx-lead">Contracts, grants, funding, investment and support. See in seconds how the platform would judge your business.</p>
+        <div className="lx-types" role="tablist" aria-label="Type">
+          <button className={kind === 'all' ? 'on' : ''} onClick={() => setKind('all')}>All <i>{all.length}</i></button>
+          {KIND_ORDER.map((k) => (
+            <button key={k} className={`${kind === k ? 'on' : ''} ${count(k) === 0 ? 'empty' : ''}`} onClick={() => setKind(k)}>{KIND_LABEL[k]} <i>{count(k)}</i></button>))}
+        </div>
         <div className="lx-filters">
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, buyer, sector or province" aria-label="Search" />
-          <div>{(['all', ...kinds] as (Kind | 'all')[]).map((k) => <button key={k} className={kind === k ? 'on' : ''} onClick={() => setKind(k)}>{k === 'all' ? 'All' : KIND_LABEL[k]}</button>)}</div>
+          <select value={sector} onChange={(e) => setSector(e.target.value)} aria-label="Sector"><option value="">All sectors</option>{sectors.map((s) => <option key={s} value={s}>{pretty(s)}</option>)}</select>
+          <select value={province} onChange={(e) => setProvince(e.target.value)} aria-label="Province"><option value="">All provinces</option>{provinces.map((s) => <option key={s}>{s}</option>)}</select>
+          <button className={soon ? 'on' : ''} onClick={() => setSoon(!soon)}>Closing soon</button>
+          <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Sort"><option value="closing">Closing soonest</option><option value="value">Highest value</option></select>
+          {filtered && <button className="lx-clear" onClick={() => { setKind('all'); setQ(''); setSector(''); setProvince(''); setSoon(false) }}>Clear</button>}
         </div>
         {list.loading && <Spinner />}
+        <p className="lx-count-line">{shown.length} {shown.length === 1 ? 'opportunity' : 'opportunities'}</p>
         <div className="lx-grid">{shown.map((o) => <OppCard key={o.id} o={o} />)}</div>
-        {!list.loading && shown.length === 0 && <p className="lx-lead">Nothing matches that search.</p>}
+        {!list.loading && shown.length === 0 && <p className="lx-lead">Nothing matches those filters.</p>}
       </main>
       {gate.modal}
     </div>

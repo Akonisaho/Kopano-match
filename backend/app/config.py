@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # The app connects as kopano_app (no UPDATE/DELETE on audit). seed.py uses the admin URL.
-    database_url: str = "postgresql://kopano_app:kopano_app_dev@localhost:55432/kopano"
-    admin_database_url: str = "postgresql://postgres:postgres@localhost:55432/kopano"
+    database_url: str = "postgresql+psycopg2://kopano_app:kopano_app_dev@localhost:55432/kopano"
+    admin_database_url: str = "postgresql+psycopg2://postgres:postgres@localhost:55432/kopano"
 
     environment: str = "dev"
     jwt_secret: str = DEV_JWT_SECRET

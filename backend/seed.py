@@ -1,11 +1,16 @@
 """Rebuild the schema, apply grants, load the planted demo data.  Run from backend/:  python seed.py
 
+Clean start for a demo you build yourself:  python seed.py --empty
+  Creates the schema and ONE admin account (ADMIN_EMAIL, ADMIN_PASSWORD). No SMEs, no opportunities.
+
+
 DESTRUCTIVE: drops and recreates every table. It refuses to run unless ENVIRONMENT=dev.
 Runs as the admin role; the app itself connects as kopano_app, which cannot touch the audit log.
 All demo accounts share SEED_PASSWORD (default below). Never use this seed outside a demo.
 """
 
 import os
+import sys
 import uuid
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -48,6 +53,32 @@ def sid(key: str) -> uuid.UUID:
     return uuid.uuid5(NS, key)
 
 
+def create_admin_only(admin_engine) -> None:
+    """The one account that cannot self-register. Everything else is created through the app."""
+    email = os.environ.get("ADMIN_EMAIL", "admin@kopano.demo").lower()
+    password = os.environ.get("ADMIN_PASSWORD", SEED_PASSWORD)
+    with Session(admin_engine) as db:
+        db.add(
+            m.User(
+                email=email,
+                password_hash=hash_password(password),
+                full_name="Platform Reviewer",
+                role="admin",
+                consent_version=settings.consent_version,
+                consent_at=datetime.now(UTC),
+            )
+        )
+        db.add(
+            m.AuditLog(
+                user_id=None, action="bootstrap", entity_type="system", new_value={"mode": "empty"}
+            )
+        )
+        db.commit()
+    print("Clean database created. No SMEs, no opportunities.")
+    print(f"Admin login: {email}  (password from ADMIN_PASSWORD, or SEED_PASSWORD if unset)")
+    print("Register every other account through the app, then upload your own documents.")
+
+
 def main() -> None:
     if settings.environment != "dev":
         raise SystemExit("Refusing to reseed: ENVIRONMENT is not 'dev'.")
@@ -58,6 +89,10 @@ def main() -> None:
     Base.metadata.create_all(admin)
     with admin.begin() as conn:
         conn.execute(text((DB_DIR / "grants.sql").read_text()))
+
+    if "--empty" in sys.argv:
+        create_admin_only(admin)
+        return
 
     smes, opps, meta = build_seed()
     pw = hash_password(SEED_PASSWORD)

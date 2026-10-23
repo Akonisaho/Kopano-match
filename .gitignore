@@ -9,3 +9,4 @@ node_modules/
 dist/
 *.docx
 .claude/settings.local.json
+demo-documents/

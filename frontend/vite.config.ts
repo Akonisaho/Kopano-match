@@ -8,6 +8,8 @@ export default defineConfig({
     proxy: { '/api': { target: 'http://127.0.0.1:8000', rewrite: (p) => p.replace(/^\/api/, '') } },
   },
   preview: {
+    // A tunnel serves this under its own hostname, which the preview server would otherwise refuse
+    allowedHosts: true,
     proxy: { '/api': { target: 'http://127.0.0.1:8000', rewrite: (p) => p.replace(/^\/api/, '') } },
   },
 })

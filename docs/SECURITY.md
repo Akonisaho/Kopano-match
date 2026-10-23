@@ -132,3 +132,18 @@ ClamAV's test signature matches only a file that is the test string, so test fil
 header. The real-ClamAV tests do not run in CI because the container is large; the protocol tests
 do. Definitions update inside the container, so a production deployment needs a plan for keeping it
 running and current.
+
+## Awards, impact reporting and consortium invitations
+
+| Control | Where | Proven by |
+|---|---|---|
+| Only the buyer that owns an opportunity can award on it, and only after a shortlist. An award is final | `routers/applications.py` | `test_awarding_needs_a_shortlist_freezes_the_record_and_feeds_the_impact_report` |
+| The scores at the moment of award are frozen in the append-only audit log | `services.decision_snapshot` | the same test (dossier shows the awarded snapshot) |
+| The impact report is aggregates only, scoped to the buyer's own awards, with no business named | `services.impact` | the same test, plus the browser check |
+| Consortium invitees see their own part and a partner count, never the partners' names, until everyone accepts | `routers/consortia.py` | `test_consortium_invitations_full_lifecycle_and_privacy` |
+| Only invited SMEs can answer, only once, and a decline lapses the proposal | `routers/consortia.py` | the same test |
+
+Honest limits: the impact report states ownership in aggregate, which is further use of special
+personal information beyond matching, so the privacy notice says so. A buyer enters the award value
+itself; it is not reconciled against a signed contract. Consortium formation records the businesses'
+agreement to bid together, not a legal agreement between them.

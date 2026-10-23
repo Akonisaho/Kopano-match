@@ -158,6 +158,10 @@ function UnlockPlan({ gaps }: { gaps: (Gap & { blocks: string[] })[] }) {
             </div>
             <p style={{ margin: '0 0 10px', fontSize: 13, color: '#475467' }}>
               <b>{plan.total_days} days and {zar(plan.total_cost_zar)}</b> in total. The documents are obtained at the same time, so the wait is the longest one.</p>
+            {plan.routes.length > 0 && plan.routes[0].gain_value > 0 && (
+              <div className="callout purple" style={{ marginTop: 0, marginBottom: 12, background: '#faf5ff', color: '#4c1d95' }}>
+                <b>Best first move: {plan.routes[0].label}.</b> On its own it opens {zar(plan.routes[0].gain_value)} of contracts in about {plan.routes[0].days} days
+                ({plan.routes[0].issuer}{plan.routes[0].cost_zar ? `, ${zar(plan.routes[0].cost_zar)}` : ', no cost'}).</div>)}
             {changed.length > 0 ? <div className="table-wrap"><table>
               <thead><tr><th>Opportunity</th><th>Now</th><th>After</th></tr></thead>
               <tbody>{changed.map((o) => (
@@ -494,3 +498,38 @@ export function Onboarding() {
 }
 
 export type { ProfileResponse }
+
+/* ------------------------------------------------------------------ consortium invitations */
+
+export function Consortia() {
+  const toast = useToast()
+  const list = useLoad(() => api.consortia())
+  if (!list.data) return <Spinner />
+  async function answer(id: string, accept: boolean) {
+    try {
+      const r = await api.respondConsortium(id, accept)
+      toast(r.status === 'formed' ? 'Everyone accepted: the consortium is formed.' : accept ? 'Accepted. Waiting for your partners.' : 'Declined.', 'success')
+      list.reload()
+    } catch (err) { toast((err as Error).message, 'error') }
+  }
+  return (
+    <>
+      <Welcome title="Consortium invitations"
+        text="When no single business can deliver a whole contract, a buyer can propose a group. You see your own part and how many partners there are. Partner names are shared only once everyone has accepted." />
+      {list.data.length === 0 ? <Panel><div className="empty"><strong>No invitations</strong>If a buyer proposes you for a group bid, it appears here and in your notifications.</div></Panel>
+        : list.data.map((c) => (
+          <Panel key={c.id} title={c.opportunity.title} sub={`${c.opportunity.provider} · ${zar(c.opportunity.contract_value)}`}
+            right={<Badge tone={c.status === 'formed' ? 'green' : c.status === 'declined' ? 'gray' : 'amber'}>{c.status === 'proposed' ? 'Waiting' : pretty(c.status)}</Badge>}>
+            <p style={{ margin: '0 0 8px', fontSize: 13.5 }}><b>Your part{c.my_role === 'lead' ? ' (proposed lead)' : ''}:</b> {c.my_part.join(', ') || 'to be agreed'}</p>
+            <p className="hint" style={{ margin: 0 }}>{c.partners} partner{c.partners === 1 ? '' : 's'} · {c.accepted} of {c.partners + 1} accepted · the group covers {c.coverage_pct}% of the scope</p>
+            {c.status === 'formed' && <div className="callout green">Your partners: <b>{c.partner_names.join(', ')}</b></div>}
+            {c.status === 'declined' && <div className="callout gray">A partner declined, so this proposal has lapsed.</div>}
+            {c.status === 'proposed' && c.my_response === 'pending' && (
+              <div className="table-actions" style={{ marginTop: 14 }}>
+                <button className="btn btn-primary" onClick={() => answer(c.id, true)}>Accept</button>
+                <button className="btn btn-outline" onClick={() => answer(c.id, false)}>Decline</button></div>)}
+            {c.status === 'proposed' && c.my_response === 'accepted' && <div className="callout blue">You accepted. Waiting for the others.</div>}
+          </Panel>))}
+    </>
+  )
+}

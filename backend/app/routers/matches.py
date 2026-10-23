@@ -163,6 +163,8 @@ def detail(
 
 def _decide(match_id: uuid.UUID, new_status: str, user: m.User, db: Session) -> dict:
     match = readable_match(db, user, match_id)
+    if match.status == "awarded":
+        raise HTTPException(409, "This match has already been awarded")
     old = match.status
     match.status = new_status
     write_audit(

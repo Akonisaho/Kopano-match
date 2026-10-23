@@ -104,7 +104,7 @@ export const api = {
     request<{ source: string; draft: ReqDraft }>('/opportunities/extract', json('POST', { text })),
   runMatch: (id: string) => request<MatchRow[]>(`/opportunities/${id}/match`, json('POST')),
   matches: (id: string) => request<MatchRow[]>(`/opportunities/${id}/matches`),
-  consortium: (id: string) => request<{ consortium: Consortium | null }>(`/opportunities/${id}/consortium`),
+  consortium: (id: string) => request<{ consortium: Consortium | null; invitation: ConsortiumInvitation | null }>(`/opportunities/${id}/consortium`),
   match: (id: string) => request<MatchDetail>(`/matches/${id}`),
   decide: (id: string, action: 'shortlist' | 'reject') => request<unknown>(`/matches/${id}/${action}`, json('POST')),
 
@@ -115,6 +115,15 @@ export const api = {
   directory: () => request<DirectorySme[]>('/providers/smes'),
   shortlist: () => request<ShortlistRow[]>('/providers/shortlist'),
   bottlenecks: () => request<UnlockMapData>('/providers/bottlenecks'),
+  impact: () => request<ImpactData>('/providers/impact'),
+  impactCsv: async () => (await raw('/providers/impact.csv')).blob(),
+  award: (matchId: string, value: number) =>
+    request<{ status: string; value: number }>(`/applications/${matchId}/award`, json('POST', { value })),
+  inviteConsortium: (oppId: string) =>
+    request<ConsortiumInvitation>(`/opportunities/${oppId}/consortium/invite`, json('POST')),
+  consortia: () => request<ConsortiumInvite[]>('/consortia'),
+  respondConsortium: (id: string, accept: boolean) =>
+    request<{ status: string; my_response: string }>(`/consortia/${id}/respond`, json('POST', { accept })),
   dossier: (id: string) => request<DossierData>(`/matches/${id}/dossier`),
 
   queue: () => request<Queue>('/admin/queue'),
@@ -215,6 +224,7 @@ export interface UnlockResult {
   selected: { code: string; label: string; issuer: string; days: number; cost_zar: number }[]
   total_days: number
   total_cost_zar: number
+  routes: { code: string; label: string; issuer: string; days: number; cost_zar: number; gain_value: number; newly_award_ready: number }[]
   before: { award_ready: number; value: number }
   after: { award_ready: number; value: number }
   opportunities: {
@@ -239,6 +249,23 @@ export interface DossierData {
   verifications: Verification[]
   decisions: { action: string; at: string; by_role: string | null; by_organisation: string | null; snapshot: { fit: number; readiness: number; quadrant: Quadrant } | null }[]
   matches_decision_snapshot: boolean | null
+}
+export interface ImpactData {
+  applications: number; awards: number; smes_awarded: number; value_awarded: number; conversion_pct: number
+  days_to_award_median: number | null; days_to_award_mean: number | null
+  awarded_despite_gap: { awards: number; value: number; meaning: string }
+  ownership: Record<'youth' | 'black' | 'black_women', { awards: number; value: number; share_pct: number }>
+  by_province: { name: string; value: number }[]; by_sector: { name: string; value: number }[]
+}
+export interface ConsortiumInvitation {
+  id: string; status: 'proposed' | 'formed' | 'declined'; coverage_pct: number
+  members: { sme_id: string; name: string; role: string; scope: string[]; response: 'pending' | 'accepted' | 'declined' }[]
+}
+export interface ConsortiumInvite {
+  id: string; status: 'proposed' | 'formed' | 'declined'
+  opportunity: { id: string; title: string; contract_value: number; provider: string }
+  my_role: string; my_part: string[]; my_response: 'pending' | 'accepted' | 'declined'
+  partners: number; accepted: number; coverage_pct: number; partner_names: string[]
 }
 export interface SmeOpportunity {
   opportunity_id: string; title: string; kind: Kind; provider: string; provider_status: string

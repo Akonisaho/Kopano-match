@@ -335,7 +335,7 @@ def test_application_flow_and_ownership():
 def test_provider_overview_and_directory_hide_sensitive_fields():
     corp = login("corporate@kopano.demo")
     ov = client.get("/providers/overview", headers=corp).json()
-    assert ov["active_opportunities"] == 6 and ov["matched_smes"] > 0
+    assert ov["active_opportunities"] >= 6 and ov["matched_smes"] > 0
     assert ov["organisation"]["verification_status"] == "verified"
     directory = client.get("/providers/smes", headers=corp).json()
     assert len(directory) >= 40 and "ownership" not in directory[0]
@@ -705,3 +705,237 @@ def test_overlong_passwords_get_a_clear_422_not_a_server_error():
     # signing in with an absurdly long password is a plain refusal, never a crash
     login_long = client.post("/auth/login", data={"username": base["email"], "password": "D" * 500})
     assert login_long.status_code == 401
+
+
+# ---- awards, impact report, fastest route ----
+
+
+def _match_id(headers, opp_title, sme_name):
+    opp = opp_id(headers, opp_title)
+    ranked = client.get(f"/opportunities/{opp}/matches", headers=headers).json()
+    return next(r["match_id"] for r in ranked if r["sme_name"] == sme_name)
+
+
+def test_awarding_needs_a_shortlist_freezes_the_record_and_feeds_the_impact_report():
+    corp = login("corporate@kopano.demo")
+    roads = "Provincial roads rehabilitation"
+    khaya = _match_id(corp, roads, "Khaya Earthworks")
+    thabo = _match_id(corp, roads, "Thabo Civils")  # has open document gaps
+    unshortlisted = _match_id(corp, roads, "Emerging Surfacing")
+
+    # Not shortlisted: refused
+    refusal = client.post(
+        f"/applications/{unshortlisted}/award", headers=corp, json={"value": 1000}
+    )
+    assert refusal.status_code == 409 and "Shortlist" in refusal.json()["detail"]
+
+    for mid, value in ((khaya, 4_000_000), (thabo, 3_500_000)):
+        assert client.post(f"/matches/{mid}/shortlist", headers=corp).status_code in (200, 409)
+        first = client.post(f"/applications/{mid}/award", headers=corp, json={"value": value})
+        assert first.status_code in (200, 409)  # 409 only if an earlier run already awarded it
+        again = client.post(f"/applications/{mid}/award", headers=corp, json={"value": value})
+        assert again.status_code == 409 and "Already awarded" in again.json()["detail"]
+        # An award is final: it cannot be quietly turned into a rejection
+        assert client.post(f"/matches/{mid}/reject", headers=corp).status_code == 409
+
+    assert (
+        client.post(f"/applications/{khaya}/award", headers=corp, json={"value": -5}).status_code
+        == 422
+    )
+    stranger = register("corporate")
+    assert (
+        client.post(
+            f"/applications/{khaya}/award", headers=stranger, json={"value": 1000}
+        ).status_code
+        == 404
+    )
+    sme = login("sme-005@sme.demo")
+    assert (
+        client.post(f"/applications/{khaya}/award", headers=sme, json={"value": 1000}).status_code
+        == 403
+    )
+
+    # The reasoning at the moment of award is frozen in the audit trail and shows in the dossier
+    d = client.get(f"/matches/{khaya}/dossier", headers=corp).json()
+    won = [x for x in d["decisions"] if x["action"] == "match_awarded"][-1]
+    assert won["snapshot"]["gate"] and won["snapshot"]["model_version"] == "v1"
+    assert d["status"] == "awarded"
+
+    # The SME is told, and the provider's application list shows the status
+    titles = [n["title"] for n in client.get("/notifications", headers=sme).json()["items"]]
+    assert any(t.startswith("Awarded:") for t in titles)
+    apps = client.get("/applications", headers=corp).json()
+    assert any(a["sme"] == "Khaya Earthworks" and a["status"] == "awarded" for a in apps)
+
+    impact = client.get("/providers/impact", headers=corp).json()
+    assert impact["awards"] >= 2 and impact["value_awarded"] >= 7_500_000
+    assert impact["awarded_despite_gap"]["awards"] >= 1  # Thabo had open gaps when awarded
+    assert impact["ownership"]["youth"]["share_pct"] > 0  # Thabo is youth-owned
+    assert impact["by_province"] and impact["by_sector"]
+    assert impact["days_to_award_median"] is not None
+    # Aggregates only: no business names anywhere in the report
+    assert "Thabo" not in str(impact) and "Khaya" not in str(impact)
+
+    csv_text = client.get("/providers/impact.csv", headers=corp)
+    assert csv_text.status_code == 200 and csv_text.headers["content-type"].startswith("text/csv")
+    assert "Value awarded (ZAR)" in csv_text.text and "Thabo" not in csv_text.text
+    assert client.get("/providers/impact", headers=sme).status_code == 403
+    assert client.get("/providers/impact", headers=login("admin@kopano.demo")).status_code == 200
+    # Another buyer sees none of this buyer's awards
+    other = client.get("/providers/impact", headers=login("funder@kopano.demo")).json()
+    assert other["value_awarded"] < impact["value_awarded"]
+
+
+def test_unlock_plan_ranks_the_fastest_route_first():
+    sme = login("sme-001@sme.demo")
+    both = client.post(
+        "/smes/me/simulate", headers=sme, json={"credentials": ["COID", "CIDB"]}
+    ).json()
+    routes = both["routes"]
+    assert {r["code"] for r in routes} == {"COID", "CIDB"}
+    # Readiness 75 (three of four documents) already clears the 60 line, so each one alone
+    # unlocks the same contract. The faster one is the better first move.
+    assert all(r["gain_value"] > 0 and r["newly_award_ready"] == 1 for r in routes)
+    assert routes[0]["code"] == "COID" and routes[0]["days"] < routes[1]["days"]
+    per_day = [r["gain_value"] / r["days"] for r in routes]
+    assert per_day == sorted(per_day, reverse=True)
+    single = client.post("/smes/me/simulate", headers=sme, json={"credentials": ["COID"]}).json()
+    assert single["after"]["award_ready"] > single["before"]["award_ready"]
+    already = client.post(
+        "/smes/me/simulate", headers=login("sme-004@sme.demo"), json={"credentials": ["TCS"]}
+    ).json()
+    assert already["routes"] == []  # nothing to obtain: already valid
+
+
+# ---- consortium invitations ----
+
+
+def _email_of(org_id) -> str:
+    with engine.connect() as conn:
+        return conn.execute(
+            text(
+                "SELECT email FROM core.users WHERE organisation_id = :o AND deleted_at IS NULL LIMIT 1"
+            ),
+            {"o": str(org_id)},
+        ).scalar_one()
+
+
+def test_consortium_invitations_full_lifecycle_and_privacy():
+    corp = login("corporate@kopano.demo")
+    body = {
+        "kind": "procurement",
+        "title": f"Consortium test {uuid.uuid4().hex[:6]}",
+        "sector": "agriculture",
+        "province": "Limpopo",
+        "contract_value": 3_000_000,
+        "duration_months": 12,
+        "scope_items": [
+            {"code": "AGR-LOG", "value": 1_500_000},
+            {"code": "MFG-FAB", "value": 1_500_000},
+        ],
+        "requirements": [],
+    }
+    opp = client.post("/opportunities", headers=corp, json=body).json()["id"]
+    client.post(f"/opportunities/{opp}/match", headers=corp)
+
+    first = client.post(f"/opportunities/{opp}/consortium/invite", headers=corp)
+    assert first.status_code == 201
+    inv = first.json()
+    assert inv["status"] == "proposed" and len(inv["members"]) >= 2
+    assert all(mm["response"] == "pending" and mm["scope"] for mm in inv["members"])
+    assert client.post(f"/opportunities/{opp}/consortium/invite", headers=corp).status_code == 409
+
+    names = [mm["name"] for mm in inv["members"]]
+    heads = [login(_email_of(mm["sme_id"])) for mm in inv["members"]]
+
+    # Privacy: an invited SME sees its own part and a count, never the partners' names
+    mine = next(
+        i
+        for i in client.get("/consortia", headers=heads[0]).json()
+        if i["opportunity"]["id"] == opp
+    )
+    assert mine["my_part"] and mine["partners"] == len(names) - 1 and mine["partner_names"] == []
+    assert not any(n in str(mine) for n in names[1:])
+
+    # Only invited SMEs can answer; a buyer cannot answer for them
+    outsider = login("sme-001@sme.demo")
+    assert (
+        client.post(
+            f"/consortia/{mine['id']}/respond", headers=outsider, json={"accept": True}
+        ).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            f"/consortia/{mine['id']}/respond", headers=corp, json={"accept": True}
+        ).status_code
+        == 403
+    )
+    stranger = register("corporate")
+    assert (
+        client.post(f"/opportunities/{opp}/consortium/invite", headers=stranger).status_code == 404
+    )
+
+    # One decline and the proposal lapses for everybody
+    declined = client.post(
+        f"/consortia/{mine['id']}/respond", headers=heads[0], json={"accept": False}
+    )
+    assert declined.json()["status"] == "declined"
+    assert (
+        client.post(
+            f"/consortia/{mine['id']}/respond", headers=heads[1], json={"accept": True}
+        ).status_code
+        == 409
+    )
+    assert (
+        client.get(f"/opportunities/{opp}/consortium", headers=corp).json()["invitation"]["status"]
+        == "declined"
+    )
+    lapsed = [n["title"] for n in client.get("/notifications", headers=heads[1]).json()["items"]]
+    assert any(t.startswith("Consortium lapsed") for t in lapsed)
+
+    # The buyer can invite again, and this time everyone accepts
+    again = client.post(f"/opportunities/{opp}/consortium/invite", headers=corp)
+    assert again.status_code == 201 and again.json()["id"] != inv["id"]
+    for head in heads:
+        row = next(
+            i
+            for i in client.get("/consortia", headers=head).json()
+            if i["opportunity"]["id"] == opp and i["status"] == "proposed"
+        )
+        assert (
+            client.post(
+                f"/consortia/{row['id']}/respond", headers=head, json={"accept": True}
+            ).status_code
+            == 200
+        )
+        assert (
+            client.post(
+                f"/consortia/{row['id']}/respond", headers=head, json={"accept": True}
+            ).status_code
+            == 409
+        )
+
+    formed = client.get(f"/opportunities/{opp}/consortium", headers=corp).json()["invitation"]
+    assert formed["status"] == "formed" and all(
+        mm["response"] == "accepted" for mm in formed["members"]
+    )
+    final = next(
+        i
+        for i in client.get("/consortia", headers=heads[0]).json()
+        if i["opportunity"]["id"] == opp and i["status"] == "formed"
+    )
+    assert sorted(final["partner_names"]) == sorted(names[1:])  # names revealed only now
+    assert any(
+        t.startswith("Consortium formed")
+        for t in [
+            n["title"] for n in client.get("/notifications", headers=heads[1]).json()["items"]
+        ]
+    )
+    assert client.post(f"/opportunities/{opp}/consortium/invite", headers=corp).status_code == 409
+    trail = client.get(
+        "/admin/audit",
+        params={"entity_type": "consortium", "entity_id": final["id"]},
+        headers=login("admin@kopano.demo"),
+    ).json()
+    assert any(a["action"] == "consortium_response" for a in trail)

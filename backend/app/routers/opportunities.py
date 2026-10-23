@@ -12,6 +12,7 @@ from ..db import get_db
 from ..llm import client, prompts
 from ..schemas import ExtractIn, OpportunityIn
 from ..services import consortium as build_consortium
+from ..services import consortium_invitation
 from ..services import run_matching
 
 router = APIRouter(prefix="/opportunities", tags=["opportunities"])
@@ -225,8 +226,9 @@ def consortium(
     if built is None:
         raise HTTPException(404, "Not found")
     _, smes, c = built
+    invitation = consortium_invitation(db, o.id)
     if c is None:
-        return {"consortium": None}
+        return {"consortium": None, "invitation": invitation}
     names = {s.id: s.name for s in smes}
     return {
         "consortium": {
@@ -234,5 +236,6 @@ def consortium(
             "members": [{"sme_id": i, "name": names[i]} for i in c.member_sme_ids],
             "coverage_pct": c.coverage_pct,
             "uncovered_codes": c.uncovered_codes,
-        }
+        },
+        "invitation": invitation,
     }

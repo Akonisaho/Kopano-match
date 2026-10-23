@@ -12,6 +12,7 @@ from .. import notifications
 from ..audit import write_audit
 from ..auth import PROVIDER_ROLES, current_user, require_role
 from ..db import get_db
+from ..schemas import AwardIn
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -20,7 +21,9 @@ def application_status(match: m.Match, app: m.Application | None) -> str | None:
     """One status the UI can show: the provider's decision wins once it is made."""
     if app is None:
         return None
-    return {"shortlisted": "shortlisted", "rejected": "declined"}.get(match.status, app.status)
+    return {"shortlisted": "shortlisted", "rejected": "declined", "awarded": "awarded"}.get(
+        match.status, app.status
+    )
 
 
 @router.post("/{match_id}", status_code=201)
@@ -80,3 +83,51 @@ def list_applications(user: m.User = Depends(current_user), db: Session = Depend
         }
         for a, mt, o, org in db.execute(q)
     ]
+
+
+@router.post("/{match_id}/award")
+def award(
+    match_id: uuid.UUID,
+    body: AwardIn,
+    user: m.User = Depends(require_role(*PROVIDER_ROLES)),
+    db: Session = Depends(get_db),
+):
+    """Record an award. The SME must be shortlisted first. The scores at that moment are frozen
+    into the append-only audit log, and the SME is told."""
+    from datetime import UTC, datetime
+
+    from ..services import decision_snapshot
+
+    match = db.get(m.Match, match_id)
+    opp = db.get(m.Opportunity, match.opportunity_id) if match else None
+    if match is None or opp.organisation_id != user.organisation_id:
+        raise HTTPException(404, "Not found")
+    if match.status == "awarded":
+        raise HTTPException(409, "Already awarded")
+    if match.status != "shortlisted":
+        raise HTTPException(409, "Shortlist the SME before awarding")
+    now = datetime.now(UTC)
+    app = db.scalar(select(m.Application).where(m.Application.match_id == match.id))
+    if app is None:
+        app = m.Application(match_id=match.id)
+        db.add(app)
+    app.status = "awarded"
+    app.awarded_value = body.value
+    app.awarded_at = now
+    app.decided_at = now
+    app.gate_at_award = match.gate
+    app.quadrant_at_award = match.quadrant
+    match.status = "awarded"
+    db.flush()
+    write_audit(
+        db,
+        user.id,
+        "match_awarded",
+        "match",
+        match.id,
+        old={"status": "shortlisted"},
+        new={"status": "awarded", "value": body.value, "snapshot": decision_snapshot(match)},
+    )
+    db.commit()
+    notifications.match_awarded(db, match, body.value)
+    return {"match_id": match.id, "status": "awarded", "value": body.value}

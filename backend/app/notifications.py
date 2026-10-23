@@ -119,3 +119,108 @@ def application_received(db: Session, match: m.Match) -> None:
     for u in users_of(db, opp.organisation_id):
         notify(db, u, subject, lines, "Review the match", f"/app/matches/{match.id}")
     db.commit()
+
+
+def match_awarded(db: Session, match: m.Match, value: float) -> None:
+    opp = db.get(m.Opportunity, match.opportunity_id)
+    provider = db.get(m.Organisation, opp.organisation_id)
+    subject = f"Awarded: {opp.title}"
+    lines = [
+        f"{provider.name} has awarded {opp.title} to your business, valued at R{value:,.0f}.",
+        "Open the match to see the record of the decision.",
+    ]
+    for u in users_of(db, match.sme_id):
+        notify(db, u, subject, lines, "View the award", f"/app/matches/{match.id}")
+    db.commit()
+
+
+def consortium_invited(db: Session, cons: m.Consortium) -> None:
+    from .services import labels_for
+
+    opp = db.get(m.Opportunity, cons.opportunity_id)
+    provider = db.get(m.Organisation, opp.organisation_id)
+    members = list(
+        db.scalars(select(m.ConsortiumMember).where(m.ConsortiumMember.consortium_id == cons.id))
+    )
+    for member in members:
+        part = ", ".join(labels_for(member.scope_codes)) or "to be agreed"
+        subject = f"Consortium invitation: {opp.title}"
+        lines = [
+            f"{provider.name} proposes that your business joins a group of {len(members)} "
+            f"businesses for {opp.title}. Your part: {part}.",
+            "Partner names are shared once everyone has accepted. Please respond.",
+        ]
+        for u in users_of(db, member.sme_id):
+            notify(db, u, subject, lines, "Review the invitation", "/app/consortia")
+    db.commit()
+
+
+def consortium_response(db: Session, cons: m.Consortium, member: m.ConsortiumMember) -> None:
+    opp = db.get(m.Opportunity, cons.opportunity_id)
+    sme = db.get(m.Organisation, member.sme_id)
+    members = list(
+        db.scalars(select(m.ConsortiumMember).where(m.ConsortiumMember.consortium_id == cons.id))
+    )
+    names = {
+        o.id: o.name
+        for o in db.scalars(
+            select(m.Organisation).where(m.Organisation.id.in_([x.sme_id for x in members]))
+        )
+    }
+    path = f"/app/opportunities/{opp.id}"
+    if cons.status == "declined":
+        for u in users_of(db, opp.organisation_id):
+            notify(
+                db,
+                u,
+                f"Consortium declined: {opp.title}",
+                [
+                    f"{sme.name} declined the consortium invitation. The proposal has lapsed; you can invite a new group."
+                ],
+                "Open the opportunity",
+                path,
+            )
+        for x in members:
+            if x.sme_id != member.sme_id:
+                for u in users_of(db, x.sme_id):
+                    notify(
+                        db,
+                        u,
+                        f"Consortium lapsed: {opp.title}",
+                        ["A partner declined, so this proposal has lapsed."],
+                        "See your invitations",
+                        "/app/consortia",
+                    )
+    elif cons.status == "formed":
+        for u in users_of(db, opp.organisation_id):
+            notify(
+                db,
+                u,
+                f"Consortium formed: {opp.title}",
+                [f"All {len(members)} businesses accepted: {', '.join(sorted(names.values()))}."],
+                "Open the opportunity",
+                path,
+            )
+        for x in members:
+            others = sorted(n for i, n in names.items() if i != x.sme_id)
+            for u in users_of(db, x.sme_id):
+                notify(
+                    db,
+                    u,
+                    f"Consortium formed: {opp.title}",
+                    [f"Everyone accepted. Your partners are {', '.join(others)}."],
+                    "See the consortium",
+                    "/app/consortia",
+                )
+    else:
+        done = sum(1 for x in members if x.response == "accepted")
+        for u in users_of(db, opp.organisation_id):
+            notify(
+                db,
+                u,
+                f"Consortium update: {opp.title}",
+                [f"{sme.name} accepted ({done} of {len(members)})."],
+                "Open the opportunity",
+                path,
+            )
+    db.commit()

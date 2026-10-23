@@ -31,7 +31,7 @@ model.
 | Admin | Review queue only | Invite-only provider and admin accounts, user and opportunity management |
 | Operations | Server logs | Error tracking, backups with a tested restore, a short runbook |
 | Legal | Privacy notice, no Information Officer | DPIA, Information Officer, operator agreements, terms, legal review |
-| Outcomes | Not captured | Award status and days-to-award, to prove value |
+| Outcomes | Awards recorded with value and date, frozen decision record, impact report with CSV export | Award value reconciled against signed contracts, and outcome follow-up after delivery |
 
 ## Order of work
 

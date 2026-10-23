@@ -206,6 +206,12 @@ class Application(Base):
     status: Mapped[str] = mapped_column(String(20), default="submitted")
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    awarded_value: Mapped[float | None] = mapped_column(Numeric(14, 2))
+    awarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # How ready the SME was at the moment of award. This is what lets us prove how much went to
+    # businesses a strict 'must hold every document' filter would have rejected.
+    gate_at_award: Mapped[str | None] = mapped_column(String(12))
+    quadrant_at_award: Mapped[str | None] = mapped_column(String(20))
 
 
 class AuditLog(Base):
@@ -251,3 +257,37 @@ class PasswordReset(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
+
+
+class Consortium(Base):
+    """A proposed group of SMEs for one opportunity, and whether they have all said yes."""
+
+    __tablename__ = "consortia"
+    __table_args__ = (Index("ix_consortia_opportunity", "opportunity_id"), {"schema": "core"})
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), **PK)
+    opportunity_id: Mapped[uuid.UUID] = mapped_column(fk("core.opportunities.id"))
+    proposed_by: Mapped[uuid.UUID] = mapped_column(fk("core.users.id"))
+    lead_sme_id: Mapped[uuid.UUID] = mapped_column(fk("core.organisations.id"))
+    status: Mapped[str] = mapped_column(
+        String(12), default="proposed"
+    )  # proposed, formed, declined
+    coverage_pct: Mapped[float] = mapped_column(Numeric(5, 1))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ConsortiumMember(Base):
+    __tablename__ = "consortium_members"
+    __table_args__ = (
+        UniqueConstraint("consortium_id", "sme_id", name="uq_consortium_member"),
+        {"schema": "core"},
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), **PK)
+    consortium_id: Mapped[uuid.UUID] = mapped_column(fk("core.consortia.id"))
+    sme_id: Mapped[uuid.UUID] = mapped_column(fk("core.organisations.id"))
+    role: Mapped[str] = mapped_column(String(10), default="member")  # lead, member
+    scope_codes: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
+    response: Mapped[str] = mapped_column(
+        String(10), default="pending"
+    )  # pending, accepted, declined
+    responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

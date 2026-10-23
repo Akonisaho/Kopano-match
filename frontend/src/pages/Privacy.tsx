@@ -14,6 +14,7 @@ export default function Privacy() {
           <li><b>Business profile</b> (sector, province, turnover, years trading, ownership): to score fit. Providers see it only through a match, and only while "visible to providers" is on. Ownership details are used only to match a provider's stated transformation goal and are not shown in the directory.</li>
           <li><b>Compliance documents</b>: to check readiness. Only your organisation and platform reviewers can open them. We keep a fingerprint (hash) to detect the same document reused by another business.</li>
           <li><b>Service emails</b>: a welcome, a shortlisting notice and an application notice go to the people the event concerns, through an email provider that acts as our operator. They carry no scores or documents.</li>
+          <li><b>Impact reports and consortium proposals</b>: a buyer that awards work sees aggregate figures about who it reached (including ownership), with no business named. If a buyer proposes you for a consortium, the other members' names are shared with you only once everyone has accepted.</li>
           <li><b>Verification outcomes</b>: a result, a confidence figure and its source. We do <b>not</b> keep selfies, identity images or full ID numbers. The identity check receives the image, returns an outcome, and the image is discarded. We do not store the ID number at all.</li>
         </ul>
         <h2 style={{ fontSize: 17, marginTop: 28 }}>How decisions are made</h2>

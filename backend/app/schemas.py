@@ -177,3 +177,11 @@ class MfaCodeIn(Strict):
 class MfaVerifyIn(Strict):
     mfa_token: str = Field(min_length=20, max_length=1000)
     code: str = Field(min_length=6, max_length=20)
+
+
+class AwardIn(Strict):
+    value: float = Field(gt=0, le=1e10)
+
+
+class RespondIn(Strict):
+    accept: bool

@@ -314,6 +314,8 @@ class Api:
         try:
             with urllib.request.urlopen(request, timeout=60) as resp:  # noqa: S310  # nosec B310 - local API
                 raw = resp.read()
+                if "json" not in resp.headers.get("content-type", "json"):
+                    return resp.status, {"text": raw.decode("utf8", "replace")}
                 return resp.status, (json.loads(raw) if raw else {})
         except urllib.error.HTTPError as e:
             raw = e.read()
@@ -457,6 +459,35 @@ def main():
             api.call("POST", f"/matches/{row['match_id']}/shortlist", ptoken[by])
         if row["sme_name"] in ("Masego Infrastructure", "Nomsa Builders"):
             api.call("POST", f"/applications/{row['match_id']}", stokens[row["sme_name"]])
+
+    print("Recording awards and inviting a consortium ...")
+    # A split award on the roads tender. Thabo still had open document gaps when awarded, which
+    # is exactly the case a strict "must hold every document" filter would have rejected.
+    by_name = {row["sme_name"]: row["match_id"] for row in ranked}
+    for name, value in (("Masego Infrastructure", 2_500_000), ("Thabo Civils", 1_700_000)):
+        status, body = api.call(
+            "POST", f"/applications/{by_name[name]}/award", ptoken[by], body={"value": value}
+        )
+        if status != 200:
+            fail(f"award for {name}: {status} {body.get('detail')}")
+    by2, agri = opp_ids["Integrated agri-hub build"]
+    status, inv = api.call("POST", f"/opportunities/{agri}/consortium/invite", ptoken[by2])
+    if status != 201:
+        fail(f"consortium invite: {status} {inv.get('detail')}")
+    # Two of three accept now. The last answer is left for you to give live in the demo.
+    for member in inv["members"]:
+        if member["name"] in ("AgriFresh Processors", "LinkNet Solutions"):
+            _, mine = api.call("GET", "/consortia", stokens[member["name"]])
+            row = next(i for i in mine if i["opportunity"]["id"] == agri)
+            api.call(
+                "POST",
+                f"/consortia/{row['id']}/respond",
+                stokens[member["name"]],
+                body={"accept": True},
+            )
+    print(
+        "  BuildRight Contractors has not answered yet: sign in as that account to accept it live."
+    )
 
     print("\nDone. Sign in with password:", args.password)
     for p in PROVIDERS:

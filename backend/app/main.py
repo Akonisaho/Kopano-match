@@ -8,6 +8,7 @@ from .routers import (
     admin,
     applications,
     auth,
+    consortia,
     documents,
     matches,
     meta,
@@ -69,6 +70,7 @@ for r in (
     admin,
     meta,
     notifications,
+    consortia,
 ):
     app.include_router(r.router)
 

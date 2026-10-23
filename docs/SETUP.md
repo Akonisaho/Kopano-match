@@ -136,3 +136,25 @@ data, consortium, dossier, Unlock Map, Unlock Plan, notifications, other SMEs be
 your data, throttling, uploads, the virus test file, two-step setup and erasure. It creates one
 throwaway account (erased at the end, so one welcome email arrives) and asks for one password
 reset for a demo SME, so one reset email may arrive.
+
+## 11. Awards, the impact report and consortium invitations
+
+**Awards.** On an opportunity, shortlist an SME, then press **Award** and confirm the value. The SME
+is told, and the scores at that moment are frozen into the audit log. An award is final.
+
+**Impact report** (buyers, nav item *Impact*): value awarded, SMEs reached, application-to-award rate,
+median days to award, the split by province and sector, the share that went to youth, Black and
+Black women-owned businesses, and the number that sets this platform apart: **value awarded to
+businesses that still had a document gap**, which a strict "must hold every document" filter would
+have rejected. It exports as CSV. It is aggregates only: no business is named.
+
+**Consortium invitations.** When no single SME covers an opportunity, press **Invite these
+businesses** on the opportunity page. Each SME gets a notice and sees its own part and the number of
+partners, but **not their names** until everyone has accepted. One decline lapses the proposal and the
+buyer can invite a new group. SMEs answer under *Consortia*.
+
+`build_demo.py` creates a split award (one SME awarded while still missing documents) and a consortium
+with two of three accepted. Sign in as `you+buildright@...` and press Accept to finish it live.
+
+**Unlock Plan, best first move.** Tick the documents you plan to get and the plan ranks them by contract
+value opened per day of waiting, for example "Best first move: Letter of good standing (COIDA)".

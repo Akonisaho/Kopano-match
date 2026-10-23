@@ -261,6 +261,53 @@ def main() -> None:
         s, _ = api.call("GET", "/me", tok)
         check("an erased account can no longer sign in", s == 401)
 
+    print("Awards, impact and consortium invitations")
+    s, imp = api.call("GET", "/providers/impact", buyer)
+    check(
+        "the impact report counts the awards",
+        s == 200 and imp.get("awards", 0) >= 2,
+        f"{imp.get('awards')} awards, R{imp.get('value_awarded', 0):,.0f}",
+    )
+    gap = imp.get("awarded_despite_gap", {})
+    check(
+        "it shows value awarded despite an open document gap",
+        gap.get("awards", 0) >= 1,
+        f"{gap.get('awards')} awards, R{gap.get('value', 0):,.0f}",
+    )
+    s, csv = api.call("GET", "/providers/impact.csv", buyer)
+    check(
+        "the impact report exports as CSV with no business named",
+        s == 200
+        and "Value awarded (ZAR)" in csv.get("text", "")
+        and "Thabo" not in csv.get("text", ""),
+    )
+    s, _ = api.call("GET", "/providers/impact", thabo)
+    check("an SME cannot read a buyer's impact report", s == 403)
+    _, tbell = api.call("GET", "/notifications", thabo)
+    check(
+        "an awarded SME is notified",
+        any(n["title"].startswith("Awarded") for n in tbell.get("items", [])),
+    )
+    _, inv = api.call("GET", f"/opportunities/{agri['id']}/consortium", buyer)
+    invitation = (inv or {}).get("invitation") or {}
+    check(
+        "the buyer sees the consortium invitation and each answer",
+        bool(invitation.get("members")) and invitation.get("status") == "proposed",
+        ", ".join(f"{m['name'].split()[0]}:{m['response']}" for m in invitation.get("members", [])),
+    )
+    br = login(plus(args.email, "buildright"))
+    _, mine = api.call("GET", "/consortia", br) if br else (0, [])
+    row = next((i for i in mine if i["opportunity"]["id"] == agri["id"]), None)
+    others = [
+        m["name"] for m in invitation.get("members", []) if m["name"] != "BuildRight Contractors"
+    ]
+    check(
+        "an invited SME sees its own part but not the partners' names while any answer is pending",
+        bool(row)
+        and row["my_response"] == "pending"
+        and row["partner_names"] == []
+        and not any(n in str(row) for n in others),
+    )
     print("Admin")
     s, q = api.call("GET", "/admin/queue", admin)
     check(

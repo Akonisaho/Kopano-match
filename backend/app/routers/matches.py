@@ -93,7 +93,21 @@ def _decide(match_id: uuid.UUID, new_status: str, user: m.User, db: Session) -> 
         "match",
         match.id,
         old={"status": old},
-        new={"status": new_status},
+        # A frozen copy of the reasoning at the moment of decision. Matching can be re-run
+        # later and change the live row, but the audit log cannot be rewritten.
+        new={
+            "status": new_status,
+            "snapshot": {
+                "model_version": match.model_version,
+                "gate": match.gate,
+                "quadrant": match.quadrant,
+                "fit": float(match.fit_score),
+                "readiness": float(match.readiness_score),
+                "components": match.explanation.get("components"),
+                "gaps": match.explanation.get("gaps"),
+                "risk_flags": match.risk_flags,
+            },
+        },
     )
     db.commit()
     return {"match_id": match.id, "status": match.status}

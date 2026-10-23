@@ -9,6 +9,7 @@ permissions:
 jobs:
   # CodeQL is free on public repos only. Remove this job if the repository stays private.
   codeql:
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -24,6 +25,9 @@ jobs:
       - uses: github/codeql-action/analyze@v3
   secrets:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read  # gitleaks lists a pull request's commits
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
@@ -69,6 +73,8 @@ jobs:
           npm ci
           npx --yes @cyclonedx/cyclonedx-npm --omit dev --output-format JSON \
             --spec-version 1.6 --output-file ../sbom/frontend.cdx.json
+      - name: Licence check (fails on GPL, AGPL, SSPL or undeclared licences)
+        run: python scripts/check_licenses.py sbom/backend.cdx.json sbom/frontend.cdx.json
       - uses: actions/upload-artifact@v4
         with:
           name: sbom-${{ github.sha }}

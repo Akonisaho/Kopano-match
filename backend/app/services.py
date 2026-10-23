@@ -182,6 +182,86 @@ def blockers_for(db: Session, org_id: uuid.UUID) -> dict[uuid.UUID, list[str]]:
     return out
 
 
+def simulate(db: Session, org_id: uuid.UUID, credentials: list[str]) -> dict | None:
+    """What changes if this SME obtains these credentials. Same rules, same catalogue, no guessing."""
+    from dataclasses import replace
+
+    from .engine.runner import match_one
+    from .engine.taxonomy import COMPLIANCE_CATALOGUE
+    from .engine.types import Gate
+
+    sme = next((s for s in load_smes(db, only_visible=False) if s.id == str(org_id)), None)
+    if sme is None:
+        return None
+    after_sme = replace(
+        sme, documents={**sme.documents, **{c: DocStatus.VALID for c in credentials}}
+    )
+    opps = load_open_opportunities(db)
+    everything = list(opps.values())
+    titles = {
+        str(o.id): (o.title, float(o.contract_value))
+        for o in db.scalars(select(m.Opportunity).where(m.Opportunity.status == "open"))
+    }
+
+    def view(r):
+        return {
+            "quadrant": r.quadrant,
+            "fit": r.fit,
+            "readiness": r.readiness,
+            "gate": r.gate.value,
+        }
+
+    rows, ready_before, ready_after, value_before, value_after = [], 0, 0, 0.0, 0.0
+    for opp in everything:
+        b = match_one(opp, sme, everything)
+        a = match_one(opp, after_sme, everything)
+        if b.gate == Gate.FAIL and a.gate == Gate.FAIL:
+            continue
+        title, value = titles[opp.id]
+        was, now = b.quadrant == "award_now", a.quadrant == "award_now"
+        ready_before += was
+        ready_after += now
+        value_before += value if was else 0
+        value_after += value if now else 0
+        rows.append(
+            {
+                "opportunity_id": opp.id,
+                "title": title,
+                "contract_value": value,
+                "before": None if b.gate == Gate.FAIL else view(b),
+                "after": view(a),
+                "newly_award_ready": now and not was,
+            }
+        )
+    chosen = []
+    for code in credentials:
+        c = COMPLIANCE_CATALOGUE[code]
+        status = sme.documents.get(code, DocStatus.MISSING)
+        if status == DocStatus.VALID:
+            continue
+        days = c.renew_days if status == DocStatus.EXPIRED else c.days
+        chosen.append(
+            {
+                "code": code,
+                "label": c.label,
+                "issuer": c.issuer,
+                "days": days,
+                "cost_zar": c.cost_zar,
+            }
+        )
+    return {
+        "selected": chosen,
+        # Credentials are obtained in parallel, so the wait is the longest one
+        "total_days": max((c["days"] for c in chosen), default=0),
+        "total_cost_zar": sum(c["cost_zar"] for c in chosen),
+        "before": {"award_ready": ready_before, "value": value_before},
+        "after": {"award_ready": ready_after, "value": value_after},
+        "opportunities": sorted(
+            rows, key=lambda r: (not r["newly_award_ready"], -r["contract_value"])
+        ),
+    }
+
+
 def consortium(db: Session, opportunity_id: uuid.UUID):
     open_opps = load_open_opportunities(db)
     opp = open_opps.get(opportunity_id)

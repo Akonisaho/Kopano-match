@@ -46,8 +46,7 @@ demo does not demonstrate residency.
 
 ## Roadmap, not built
 
-MFA and OTP, password reset, login rate limiting and lockout, Azure Key Vault, malware
-scanning of uploads, encryption at rest with customer-managed keys, API gateway, penetration
+MFA and OTP, password reset, Azure Key Vault, a real antivirus engine for uploads (a scanner interface with a mock exists), encryption at rest with customer-managed keys, API gateway, penetration
 test, disaster recovery, incident response runbook, retention purge job, row-level security in
 PostgreSQL, per-corporate delegated admin, SSO (Entra ID/SAML), OpenTelemetry, versioned `/v1`
 routes and idempotency keys, operator agreements and a DPIA.
@@ -79,3 +78,14 @@ Licence note for customers: `psycopg2-binary` is LGPL-licensed (with the usual l
 
 Not yet done: GitHub Actions are referenced by version tag rather than pinned commit SHA; SBOM signing
 and build provenance attestation; container image scanning (there is no image yet); a signed release.
+
+## Added since the first version
+
+| Control | Where | Proven by |
+|---|---|---|
+| Login throttle: 5 failures per account in 15 minutes, then a lockout. Keyed by submitted email, so it does not reveal which accounts exist. In-process memory, so per server process; production needs a shared store | `app/ratelimit.py`, `routers/auth.py` | `test_login_is_throttled_per_account_and_does_not_leak_which_emails_exist` |
+| Uploads pass a malware scanner interface before storage. Today the scanner is a mock that catches only the standard test file | `adapters/`, `routers/documents.py` | `test_upload_scanner_rejects_the_standard_test_signature_and_stores_nothing` |
+| Erasure deletes the organisation's uploaded files from disk, then anonymises the person | `routers/auth.py`, `routers/documents.py` | `test_erasure_deletes_uploaded_files_from_disk` |
+| A shortlist or reject decision stores a frozen copy of the scores, rules and gaps in the append-only audit log | `routers/matches.py` | `test_shortlist_writes_audit_row` |
+| The data export includes matches and applications | `routers/auth.py` | `test_data_export_includes_matches_and_applications` |
+| Unlock Plan: a what-if that re-runs the real rules, saves nothing and is limited to the signed-in SME | `services.simulate`, `routers/smes.py` | `test_unlock_plan_moves_the_numbers_using_the_real_rules` |

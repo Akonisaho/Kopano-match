@@ -131,6 +131,18 @@ class ReviewIn(Strict):
     note: str | None = Field(default=None, max_length=500)
 
 
+class SimulateIn(Strict):
+    credentials: list[str] = Field(min_length=1, max_length=6)
+
+    @field_validator("credentials")
+    @classmethod
+    def known(cls, v: list[str]) -> list[str]:
+        bad = [c for c in v if c not in COMPLIANCE_CATALOGUE]
+        if bad:
+            raise ValueError(f"Unknown credentials: {bad}")
+        return sorted(set(v))
+
+
 class ExtractIn(Strict):
     text: str = Field(min_length=20, max_length=20000)
 

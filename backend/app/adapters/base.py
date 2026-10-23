@@ -21,6 +21,19 @@ class VerificationResult:
         return self.result != "verified"
 
 
+@dataclass(frozen=True)
+class ScanResult:
+    clean: bool
+    signature: str | None
+    source_label: str
+
+
+class MalwareScanner(ABC):
+    @abstractmethod
+    def scan(self, data: bytes) -> ScanResult:
+        """Scan an upload before it is stored. A real engine (for example ClamAV) goes here."""
+
+
 class IdentityProvider(ABC):
     @abstractmethod
     def verify(self, masked_id_number: str, selfie: bytes) -> VerificationResult:

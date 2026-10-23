@@ -26,8 +26,7 @@ def main(check: bool) -> int:
             f"{len(results[o.id])}/{len(smes)} kept"
         )
         print(
-            f"  {'sme':<28}{'fit':>6}{'ready':>7}{'overall':>8}  {'quadrant':<15}"
-            f"{'gate':<11}flags"
+            f"  {'sme':<28}{'fit':>6}{'ready':>7}{'overall':>8}  {'quadrant':<15}{'gate':<11}flags"
         )
         for r in results[o.id]:
             flags = [

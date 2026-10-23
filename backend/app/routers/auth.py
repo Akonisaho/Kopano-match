@@ -8,11 +8,13 @@ from sqlalchemy.orm import Session
 
 from .. import models as m
 from ..adapters.mock import registry_provider, tax_provider
+from .. import ratelimit
 from ..audit import write_audit
 from ..auth import current_user, hash_password, issue_token, verify_password
 from ..config import settings
 from ..db import get_db
 from ..schemas import RegisterIn
+from .documents import purge_organisation_files
 
 router = APIRouter(tags=["auth"])
 
@@ -90,12 +92,24 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
 
 @router.post("/auth/login")
 def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.scalar(select(m.User).where(m.User.email == form.username.lower()))
+    key = form.username.lower()
+    wait = ratelimit.retry_after(key)
+    if wait:
+        write_audit(db, None, "login_locked", "user")
+        db.commit()
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"Too many failed attempts. Try again in {max(1, wait // 60)} minutes.",
+            headers={"Retry-After": str(wait)},
+        )
+    user = db.scalar(select(m.User).where(m.User.email == key))
     ok = verify_password(form.password, user.password_hash if user else _DUMMY_HASH)
     if not user or user.deleted_at is not None or not ok:
+        ratelimit.record_failure(key)
         write_audit(db, None, "login_failed", "user")
         db.commit()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect email or password")
+    ratelimit.clear(key)
     write_audit(db, user.id, "login", "user", user.id)
     db.commit()
     return {"access_token": issue_token(user), "token_type": "bearer", "role": user.role}
@@ -163,6 +177,31 @@ def my_data(user: m.User = Depends(current_user), db: Session = Depends(get_db))
             select(m.AuditLog).where(m.AuditLog.user_id == user.id).order_by(m.AuditLog.timestamp)
         )
     )
+    match_rows = (
+        db.execute(
+            select(m.Match, m.Opportunity)
+            .join(m.Opportunity, m.Opportunity.id == m.Match.opportunity_id)
+            .where(m.Match.sme_id == org.id)
+        ).all()
+        if org and user.role == "sme"
+        else []
+    )
+    application_rows = (
+        list(
+            db.scalars(
+                select(m.Application)
+                .join(m.Match, m.Match.id == m.Application.match_id)
+                .where(m.Match.sme_id == org.id)
+            )
+        )
+        if org and user.role == "sme"
+        else []
+    )
+    own_opportunities = (
+        list(db.scalars(select(m.Opportunity).where(m.Opportunity.organisation_id == org.id)))
+        if org and user.role != "sme"
+        else []
+    )
     write_audit(db, user.id, "data_export", "user", user.id)
     db.commit()
     return {
@@ -206,6 +245,25 @@ def my_data(user: m.User = Depends(current_user), db: Session = Depends(get_db))
             }
             for v in checks
         ],
+        "matches": [
+            {
+                "opportunity": o.title,
+                "fit_score": float(mt.fit_score),
+                "readiness_score": float(mt.readiness_score),
+                "quadrant": mt.quadrant,
+                "status": mt.status,
+                "model_version": mt.model_version,
+                "explanation": mt.explanation,
+            }
+            for mt, o in match_rows
+        ],
+        "applications": [
+            {"status": a.status, "submitted_at": a.submitted_at} for a in application_rows
+        ],
+        "opportunities_published": [
+            {"title": o.title, "kind": o.kind, "status": o.status} for o in own_opportunities
+        ],
+        "note": "Uploaded files are not included here, only their records. Ask for the files separately.",
         "audit_events": [{"action": a.action, "timestamp": a.timestamp} for a in audit],
     }
 
@@ -214,7 +272,12 @@ def my_data(user: m.User = Depends(current_user), db: Session = Depends(get_db))
 def delete_me(user: m.User = Depends(current_user), db: Session = Depends(get_db)):
     """POPIA erasure by anonymisation: personal fields are nulled, audit rows survive."""
     # The audit row is written first, then the function runs, in one transaction
-    write_audit(db, user.id, "anonymise_user", "user", user.id)
+    files = (
+        purge_organisation_files(db, user.organisation_id)
+        if user.role == "sme" and user.organisation_id
+        else 0
+    )
+    write_audit(db, user.id, "anonymise_user", "user", user.id, new={"files_deleted": files})
     db.execute(text("SELECT core.anonymise_user(:uid)"), {"uid": user.id})
     db.commit()
-    return {"status": "anonymised"}
+    return {"status": "anonymised", "files_deleted": files}

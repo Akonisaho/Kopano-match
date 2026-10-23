@@ -173,6 +173,9 @@ def test_shortlist_writes_audit_row():
         "/admin/audit", params={"entity_type": "match", "entity_id": mid}, headers=admin
     ).json()
     assert trail[0]["action"] == "match_shortlisted" and trail[0]["new"]["status"] == "shortlisted"
+    # The reasoning is frozen into the append-only log at the moment of decision
+    snap = trail[0]["new"]["snapshot"]
+    assert snap["model_version"] == "v1" and "components" in snap and "gaps" in snap
 
 
 def test_consortium_covers_the_uncovered_opportunity():
@@ -382,3 +385,80 @@ def test_unmatched_opportunities_explain_why_in_plain_language():
     assert any("youth ownership" in b for b in grant["blockers"])
     matched = next(i for i in items if i["title"] == "Provincial roads rehabilitation")
     assert matched["match"] is not None and matched["blockers"] == []
+
+
+def test_data_export_includes_matches_and_applications():
+    data = client.get("/me/data", headers=login("sme-001@sme.demo")).json()
+    assert data["matches"] and "components" in data["matches"][0]["explanation"]
+    assert "applications" in data and "note" in data
+
+
+# ---- throttle, erasure deletes files, scanner, Unlock Plan ----
+
+EICAR = rb"X5O!P%@AP[4\PZX54(P^)7CC)7}$" + b"EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+
+
+def test_login_is_throttled_per_account_and_does_not_leak_which_emails_exist():
+    email = f"{uuid.uuid4().hex[:8]}@nobody.example"  # never registered
+    codes = [
+        client.post("/auth/login", data={"username": email, "password": "wrong"}).status_code
+        for _ in range(6)
+    ]
+    assert codes[:5] == [401] * 5 and codes[5] == 429
+    # A real account is not affected by someone else's failures
+    ok = client.post("/auth/login", data={"username": "sme-004@sme.demo", "password": PASSWORD})
+    assert ok.status_code == 200
+
+
+def test_upload_scanner_rejects_the_standard_test_signature_and_stores_nothing():
+    h = register("sme")
+    r = client.post(
+        "/documents",
+        headers=h,
+        data={"document_type": "TCS"},
+        files={"file": ("x.pdf", PDF + EICAR, "application/pdf")},
+    )
+    assert r.status_code == 422 and "security scan" in r.json()["detail"]
+    assert client.get("/documents", headers=h).json() == []
+
+
+def test_erasure_deletes_uploaded_files_from_disk():
+    from pathlib import Path
+
+    h = register("sme")
+    client.post(
+        "/documents",
+        headers=h,
+        data={"document_type": "TCS"},
+        files={"file": ("t.pdf", PDF + uuid.uuid4().bytes, "application/pdf")},
+    )
+    org = client.get("/me", headers=h).json()["organisation"]["id"]
+    with engine.connect() as conn:
+        path = conn.execute(
+            text("SELECT file_url FROM sensitive.documents WHERE organisation_id = :o"), {"o": org}
+        ).scalar_one()
+    assert Path(path).is_file()
+    out = client.post("/me/delete", headers=h).json()
+    assert out["files_deleted"] == 1 and not Path(path).exists()
+
+
+def test_unlock_plan_moves_the_numbers_using_the_real_rules():
+    sme = login("sme-001@sme.demo")
+    plan = client.post("/smes/me/simulate", headers=sme, json={"credentials": ["COID", "CIDB"]})
+    assert plan.status_code == 200
+    p = plan.json()
+    assert p["after"]["award_ready"] > p["before"]["award_ready"]
+    assert p["after"]["value"] > p["before"]["value"]
+    assert p["total_days"] == 30 and p["total_cost_zar"] == 4200  # parallel wait, summed cost
+    assert any(o["newly_award_ready"] for o in p["opportunities"])
+    # Nothing is saved: the live match is unchanged
+    again = client.get("/smes/me/opportunities", headers=sme).json()
+    roads = next(i for i in again if i["title"] == "Provincial roads rehabilitation")
+    assert roads["match"]["quadrant"] == "coachable"
+    bad = client.post("/smes/me/simulate", headers=sme, json={"credentials": ["NOPE"]})
+    assert bad.status_code == 422
+    corp = login("corporate@kopano.demo")
+    assert (
+        client.post("/smes/me/simulate", headers=corp, json={"credentials": ["COID"]}).status_code
+        == 403
+    )

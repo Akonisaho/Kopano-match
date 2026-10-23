@@ -20,8 +20,8 @@ jobs:
           --health-cmd pg_isready --health-interval 10s
           --health-timeout 5s --health-retries 5
     env:
-      DATABASE_URL: postgresql://kopano_app:kopano_app_dev@localhost:5432/kopano_test
-      ADMIN_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kopano_test
+      DATABASE_URL: postgresql+psycopg2://kopano_app:kopano_app_dev@localhost:5432/kopano_test
+      ADMIN_DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/kopano_test
     defaults:
       run:
         working-directory: backend

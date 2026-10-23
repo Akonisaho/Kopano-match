@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import models as m
+from ..adapters.mock import malware_scanner
 from ..audit import write_audit
 from ..auth import current_user, own_org_or_404, require_role
 from ..config import settings
@@ -45,6 +46,19 @@ def _view(d: m.Document) -> dict:
     }
 
 
+def purge_organisation_files(db: Session, org_id: uuid.UUID) -> int:
+    """Delete an organisation's uploaded files from disk. Records stay, with no file attached."""
+    root = settings.upload_dir.resolve()
+    deleted = 0
+    for doc in db.scalars(select(m.Document).where(m.Document.organisation_id == org_id)):
+        path = Path(doc.file_url)
+        if doc.file_url != "none" and path.is_file() and root in path.resolve().parents:
+            path.unlink()
+            deleted += 1
+        doc.file_url = "none"
+    return deleted
+
+
 @router.post("", status_code=201)
 async def upload(
     document_type: str = Form(...),
@@ -66,6 +80,18 @@ async def upload(
         raise HTTPException(413, "File exceeds the size limit")
     if not data.startswith(magics):
         raise HTTPException(415, "File content does not match its type")
+    scan = malware_scanner().scan(data)
+    if not scan.clean:
+        write_audit(
+            db,
+            user.id,
+            "document_rejected_malware",
+            "document",
+            None,
+            new={"signature": scan.signature, "scanner": scan.source_label},
+        )
+        db.commit()
+        raise HTTPException(422, "This file was rejected by the security scan")
 
     digest = hashlib.sha256(data).hexdigest()
     reused_elsewhere = db.scalar(

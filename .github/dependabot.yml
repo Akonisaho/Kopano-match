@@ -1,11 +1,22 @@
 version: 2
+# One grouped pull request per ecosystem each week, instead of one per package.
+# That keeps the review load small when every merge needs the other developer's approval.
 updates:
   - package-ecosystem: pip
     directory: /backend
     schedule: { interval: weekly }
+    groups:
+      python-dependencies:
+        patterns: ["*"]
   - package-ecosystem: npm
     directory: /frontend
     schedule: { interval: weekly }
+    groups:
+      frontend-dependencies:
+        patterns: ["*"]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    groups:
+      github-actions:
+        patterns: ["*"]

@@ -79,6 +79,8 @@ export const api = {
   verifyIdentity: (form: FormData) =>
     request<{ result: string; confidence: number; source_label: string; retained: string }>(
       '/smes/me/verify-identity', { method: 'POST', body: form }),
+  simulate: (credentials: string[]) =>
+    request<UnlockResult>('/smes/me/simulate', json('POST', { credentials })),
   smeDashboard: () => request<SmeDashboard>('/smes/me/dashboard'),
   smeOpportunities: () => request<SmeOpportunity[]>('/smes/me/opportunities'),
   documents: () => request<Doc[]>('/documents'),
@@ -188,6 +190,18 @@ export interface SmeDashboard {
   readiness_score: number | null
   open_gaps: (Gap & { blocks: string[] })[]
   matches: { match_id: string; opportunity: string; contract_value: number; quadrant: Quadrant; fit: number; readiness: number; gate: string; status: string }[]
+}
+export interface UnlockResult {
+  selected: { code: string; label: string; issuer: string; days: number; cost_zar: number }[]
+  total_days: number
+  total_cost_zar: number
+  before: { award_ready: number; value: number }
+  after: { award_ready: number; value: number }
+  opportunities: {
+    opportunity_id: string; title: string; contract_value: number; newly_award_ready: boolean
+    before: { quadrant: Quadrant; fit: number; readiness: number } | null
+    after: { quadrant: Quadrant; fit: number; readiness: number }
+  }[]
 }
 export interface SmeOpportunity {
   opportunity_id: string; title: string; kind: Kind; provider: string; provider_status: string

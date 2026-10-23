@@ -803,3 +803,21 @@ textarea:focus { border-color: var(--purple2); box-shadow: 0 0 0 3px rgba(124, 5
 @media (max-width: 620px) { .lx-form { grid-template-columns: 1fr; } .lx-wrap { padding-top: 96px; } }
 .lx-gaps { grid-template-columns: 1fr !important; }
 .lx-gaps .gap-card { min-width: 0; }
+
+/* ===== The unlock moment ===== */
+.celebrate { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 20px; overflow: hidden;
+  background: radial-gradient(700px 420px at 50% 40%, rgba(124, 58, 237, 0.55), transparent 65%), rgba(5, 8, 22, 0.94); animation: lx-rise 0.5s both; }
+.celebrate-card { position: relative; text-align: center; color: #fff; max-width: 560px; width: 100%; }
+.celebrate-card small { font-size: 13px; font-weight: 800; letter-spacing: 0.24em; text-transform: uppercase; color: #ffd166; }
+.celebrate-card h2 { font: 800 clamp(48px, 9vw, 96px) / 1 Manrope, sans-serif; letter-spacing: -0.04em; margin: 10px 0 12px; background: linear-gradient(100deg, #fff, #ffd166 70%, #fb923c); -webkit-background-clip: text; background-clip: text; color: transparent; font-variant-numeric: tabular-nums; }
+.celebrate-card > p { font-size: 17px; color: #d8dcf7; margin: 0 0 22px; }
+.celebrate-list { display: grid; gap: 10px; text-align: left; }
+.celebrate-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 16px; background: rgba(255, 255, 255, 0.09); border: 1px solid rgba(255, 255, 255, 0.16); }
+.celebrate-row b { display: block; font-size: 16px; }
+.celebrate-row span { font-size: 13px; color: #ffd166; font-weight: 700; }
+.celebrate-row em { font-style: normal; font-weight: 800; color: #4ade80; }
+.celebrate-sparks { position: absolute; left: 50%; top: 38%; width: 0; height: 0; pointer-events: none; }
+.celebrate-sparks i { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #ffd166; animation: lx-burst ease-out forwards; }
+.celebrate-sparks i.c1 { background: #fb7185; }
+.celebrate-sparks i.c2 { background: #c084fc; }
+

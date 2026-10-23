@@ -518,28 +518,6 @@ def test_readiness_passport_is_shared_by_choice_and_exposes_only_safe_facts():
     assert {"passport_enabled", "passport_rotated", "passport_disabled"} <= set(actions)
 
 
-def test_uploading_a_missing_document_rescores_the_business_at_once():
-    sme = login("sme-001@sme.demo")  # planted: high fit, missing documents
-    before = client.get("/smes/me/dashboard", headers=sme).json()
-    gaps = before["open_gaps"]
-    if not gaps:  # an earlier run already closed them
-        return
-    code = gaps[0]["credential"]
-    ready_before = max(m["readiness"] for m in before["matches"])
-    up = client.post(
-        "/documents",
-        headers=sme,
-        data={"document_type": code, "expiry_date": str(date.today() + timedelta(days=300))},
-        files={"file": (f"{code}.pdf", PDF + uuid.uuid4().bytes, "application/pdf")},
-    )
-    assert up.status_code == 201, up.text
-    after = client.get("/smes/me/dashboard", headers=sme).json()
-    assert code not in [
-        g["credential"] for g in after["open_gaps"]
-    ]  # the gap closed without any rerun
-    assert max(m["readiness"] for m in after["matches"]) >= ready_before
-
-
 def test_anyone_can_browse_open_opportunities_and_check_their_fit_without_an_account():
     listed = client.get("/public/opportunities")  # no sign-in
     assert listed.status_code == 200 and listed.json()
@@ -665,3 +643,65 @@ def test_local_mode_reads_a_real_certificate_on_this_computer(monkeypatch):
     ).json()
     assert found["source"] == "embeddings" and found["results"][0]["similarity"] > 0
     _clear_embeddings()
+
+
+def test_buyer_and_business_are_told_when_the_last_gap_closes():
+    sme = register("sme")
+    put = client.put(
+        "/smes/me",
+        headers=sme,
+        json={
+            "sector": "construction",
+            "province": "Gauteng",
+            "annual_turnover": 9_000_000,
+            "years_trading": 8,
+            "largest_past_contract": 3_000_000,
+            "capability_codes": ["CON-ROADS", "CON-CIVIL", "CON-ELEC"],
+            "ownership": [],
+            "visible_to_corporates": True,
+        },
+    )
+    assert put.status_code == 200, put.text
+    corp = login("corporate@kopano.demo")
+    roads = opp_id(corp, "Provincial roads rehabilitation")
+    assert client.post(f"/opportunities/{roads}/match", headers=corp).status_code == 200
+
+    def roads_quadrant() -> str:
+        rows = client.get("/smes/me/dashboard", headers=sme).json()["matches"]
+        return next(
+            m["quadrant"] for m in rows if m["opportunity"] == "Provincial roads rehabilitation"
+        )
+
+    assert roads_quadrant() != "award_now"  # every document is missing
+    for code in ("TCS", "BBBEE", "COID", "CSD", "CIDB"):
+        up = client.post(
+            "/documents",
+            headers=sme,
+            data={"document_type": code, "expiry_date": str(date.today() + timedelta(days=300))},
+            files={"file": (f"{code}.pdf", PDF + uuid.uuid4().bytes, "application/pdf")},
+        )
+        assert up.status_code == 201, up.text
+    assert roads_quadrant() == "award_now"  # re-scored on upload, with no one pressing match again
+
+    name = client.get("/smes/me", headers=sme).json()["organisation"]["name"]
+    buyer = [n["title"] for n in client.get("/notifications", headers=corp).json()["items"]]
+    mine = [n["title"] for n in client.get("/notifications", headers=sme).json()["items"]]
+    assert f"Now award ready: {name}" in buyer
+    assert any(t.startswith("You are award ready:") for t in mine)
+
+    # Leave no trace in the shared demo data: hide the business and drop its matches again
+    client.put(
+        "/smes/me",
+        headers=sme,
+        json={
+            "sector": "construction",
+            "province": "Gauteng",
+            "annual_turnover": 9_000_000,
+            "years_trading": 8,
+            "largest_past_contract": 3_000_000,
+            "capability_codes": ["CON-ROADS", "CON-CIVIL", "CON-ELEC"],
+            "ownership": [],
+            "visible_to_corporates": False,
+        },
+    )
+    client.post(f"/opportunities/{roads}/match", headers=corp)

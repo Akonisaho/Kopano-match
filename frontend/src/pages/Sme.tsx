@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import {
   api, dateFmt, daysUntil, isProvider, KIND_LABEL, pretty, zar,
@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../auth'
 import { ProfileHealth, ReadWithAi, SemanticSearch } from '../components/AiPanels'
 import { PassportCard } from '../components/PassportCard'
+import UnlockCelebration, { type Unlocked } from '../components/UnlockCelebration'
 import { useLoad } from '../hooks'
 import {
   Badge, ErrorNote, Logo, MiniBar, Panel, QuadrantBadge, ScoreRing, Spinner, VerificationRow, Welcome, useToast,
@@ -368,6 +369,20 @@ export function Documents() {
   const tax = useLoad(() => api.taxonomy())
   const [reading, setReading] = useState<Doc | null>(null)
   const [auto, setAuto] = useState(false)
+  const [celebrate, setCelebrate] = useState<Unlocked[] | null>(null)
+  const known = useRef<Map<string, string> | null>(null)
+  useEffect(() => { api.smeDashboard().then((d) => { known.current = new Map(d.matches.map((m) => [m.match_id, m.gate])) }).catch(() => undefined) }, [])
+  /** After a document is in, did any contract just become award ready? Then show it. */
+  async function checkUnlock() {
+    try {
+      const d = await api.smeDashboard()
+      const before = known.current
+      known.current = new Map(d.matches.map((m) => [m.match_id, m.gate]))
+      // Celebrate when nothing mandatory is left in the way, not merely when a score crosses 60
+      const won = d.matches.filter((m) => m.gate === 'pass' && m.quadrant === 'award_now' && before && before.get(m.match_id) && before.get(m.match_id) !== 'pass' && m.status === 'matched')
+      if (won.length) setCelebrate(won.map((m) => ({ match_id: m.match_id, opportunity: m.opportunity, contract_value: m.contract_value })))
+    } catch { /* the page still works without it */ }
+  }
   const mode = useLoad(() => api.mode().catch(() => null))
   async function view(id: string) {
     try { window.open(URL.createObjectURL(await api.downloadDocument(id)), '_blank', 'noopener') }
@@ -388,7 +403,8 @@ export function Documents() {
               <td>{d.has_file ? <div className="table-actions"><button className="btn btn-outline btn-small" onClick={() => view(d.id)}>View</button><button className="btn btn-outline btn-small" onClick={() => { setAuto(false); setReading(d) }}>{mode.data?.ai === 'local' ? 'Read it' : 'Read with AI'}</button></div> : <span className="hint">Seeded record</span>}</td></tr>))}</tbody>
         </table></div> : <div className="empty"><strong>No documents yet</strong>Upload a tax compliance PIN or B-BBEE affidavit to improve your readiness.</div>}
       </Panel>
-      {reading && <ReadWithAi key={reading.id + String(auto)} doc={reading} auto={auto} onClose={() => setReading(null)} onChanged={docs.reload} />}
+      {reading && <ReadWithAi key={reading.id + String(auto)} doc={reading} auto={auto} onClose={() => { setReading(null); checkUnlock() }} onChanged={docs.reload} />}
+      {celebrate && <UnlockCelebration items={celebrate} onClose={() => { setCelebrate(null); docs.reload() }} />}
     </>
   )
 }

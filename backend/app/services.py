@@ -146,16 +146,27 @@ def run_matching(db: Session, opportunity_id: uuid.UUID) -> list[m.Match]:
                 sme_id=sme_id, opportunity_id=opportunity_id, model_version=r.model_version
             )
             db.add(row)
+        before = (row.explanation or {}) if row.id is not None else {}
+        was = (float(row.fit_score), float(row.readiness_score)) if row.id is not None else None
         row.gate = r.gate.value
         row.quadrant = r.quadrant
         row.fit_score = r.fit
         row.readiness_score = r.readiness
         row.overall_score = r.overall
-        prior = (row.explanation or {}).get("rationale")
+        prior = before.get("rationale")
         row.explanation = explanation_of(r)
-        if prior:
-            row.explanation["stale_rationale"] = prior  # regenerated lazily on next view
         row.risk_flags = risk_of(r)
+        unchanged = (
+            was == (float(r.fit), float(r.readiness))
+            and before.get("components") == row.explanation["components"]
+            and before.get("gaps") == row.explanation["gaps"]
+        )
+        if prior and unchanged:
+            # Same numbers, same words: keep the summary so the page opens instantly
+            row.explanation["rationale"] = prior
+            row.explanation["rationale_source"] = before.get("rationale_source")
+        elif prior:
+            row.explanation["stale_rationale"] = prior  # regenerated lazily on next view
         row.flagged = sme_id in under_review
         saved.append(row)
     # Matches that no longer pass the gate must not linger in the shortlist
@@ -164,6 +175,54 @@ def run_matching(db: Session, opportunity_id: uuid.UUID) -> list[m.Match]:
         if sme_id not in kept and row.status == "matched":
             db.delete(row)
     return saved
+
+
+def rematch_for_sme(db: Session, org_id: uuid.UUID) -> int:
+    """Re-score every opportunity this business already has a match on, so a new or renewed
+    document shows in its numbers at once. Shortlist and award status are kept. When a business
+    becomes award ready, the buyer and the business are both told. The caller commits."""
+    from . import notifications
+
+    before = {
+        r.opportunity_id: r.gate
+        for r in db.execute(
+            select(m.Match.opportunity_id, m.Match.gate).where(m.Match.sme_id == org_id)
+        )
+    }
+    for oid in before:
+        run_matching(db, oid)
+    db.flush()
+    org = db.get(m.Organisation, org_id)
+    for mt in db.scalars(select(m.Match).where(m.Match.sme_id == org_id)):
+        was = before.get(mt.opportunity_id)
+        # The moment nothing mandatory is left in the way, not merely when the score crosses 60
+        if mt.gate != "pass" or mt.quadrant != "award_now" or was in (None, "pass"):
+            continue
+        if mt.status not in ("matched", "shortlisted"):
+            continue
+        opp = db.get(m.Opportunity, mt.opportunity_id)
+        for u in notifications.users_of(db, opp.organisation_id):
+            notifications.notify(
+                db,
+                u,
+                f"Now award ready: {org.name}",
+                [
+                    f"{org.name} has closed its document gaps and is now award ready for {opp.title}.",
+                    "Open the match to review and shortlist.",
+                ],
+                "Review the match",
+                f"/app/matches/{mt.id}",
+            )
+        for u in notifications.users_of(db, org_id):
+            notifications.notify(
+                db,
+                u,
+                f"You are award ready: {opp.title}",
+                [f"Every mandatory requirement for {opp.title} is now met.", "You can apply now."],
+                "Open the match",
+                f"/app/matches/{mt.id}",
+            )
+    return len(before)
 
 
 def blockers_for(db: Session, org_id: uuid.UUID) -> dict[uuid.UUID, list[str]]:
@@ -193,7 +252,8 @@ def consortium_invitation(db: Session, opportunity_id: uuid.UUID) -> dict | None
     cons = db.scalar(
         select(m.Consortium)
         .where(m.Consortium.opportunity_id == opportunity_id)
-        .order_by(m.Consortium.created_at.desc())
+        # A live invitation always outranks a declined one, whatever the clock says
+        .order_by((m.Consortium.status == "declined").asc(), m.Consortium.created_at.desc())
         .limit(1)
     )
     if cons is None:

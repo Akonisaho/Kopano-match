@@ -10,11 +10,16 @@ from .routers import (
     auth,
     consortia,
     documents,
+    feedback,
+    inclusion,
+    ingest,
     matches,
     meta,
     notifications,
     opportunities,
+    passport,
     providers,
+    public,
     smes,
 )
 
@@ -71,6 +76,11 @@ for r in (
     meta,
     notifications,
     consortia,
+    feedback,
+    ingest,
+    passport,
+    public,
+    inclusion,
 ):
     app.include_router(r.router)
 

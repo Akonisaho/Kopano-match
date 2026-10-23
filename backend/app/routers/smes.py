@@ -11,7 +11,7 @@ from ..audit import write_audit
 from ..auth import require_role
 from ..db import get_db
 from ..llm import client, prompts
-from ..schemas import ExtractIn, ProfileIn, SimulateIn
+from ..schemas import ExtractIn, ProfileIn, SearchIn, SimulateIn
 from ..services import blockers_for, simulate
 from .applications import application_status
 from .auth import record_organisation_checks
@@ -293,3 +293,21 @@ def unlock_plan(
     if result is None:
         raise HTTPException(404, "Complete your profile first")
     return result
+
+
+@router.get("/me/quality")
+def profile_quality(user: m.User = Depends(require_role("sme")), db: Session = Depends(get_db)):
+    """Incomplete or inconsistent details, found by plain rules. Nothing here is a verdict."""
+    from .. import insights
+
+    return {"flags": insights.profile_flags(db, user.organisation_id)}
+
+
+@router.post("/me/search")
+def search_opportunities(
+    body: SearchIn, user: m.User = Depends(require_role("sme")), db: Session = Depends(get_db)
+):
+    """Find open opportunities by describing what you do or want, ranked by meaning."""
+    from .. import insights
+
+    return insights.search_opportunities(db, user.organisation_id, body.query)

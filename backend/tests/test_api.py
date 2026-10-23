@@ -296,7 +296,7 @@ def test_providers_only_see_their_own_opportunities():
     funder = client.get("/opportunities", headers=login("funder@kopano.demo")).json()
     corp = client.get("/opportunities", headers=login("corporate@kopano.demo")).json()
     assert {o["kind"] for o in corp} == {"procurement"}
-    assert {o["kind"] for o in funder} >= {"grant", "investor"}
+    assert {o["kind"] for o in funder} >= {"grant"}
     assert all(o["provider"] == "Growth Catalyst Fund" for o in funder)
 
 
@@ -580,7 +580,7 @@ def test_expiry_reminders_go_out_once_and_only_once():
     first = client.post("/admin/reminders/run", headers=admin)
     assert first.status_code == 200
     second = client.post("/admin/reminders/run", headers=admin).json()
-    assert second == {"notices_sent": 0, "documents": 0}
+    assert second["notices_sent"] == 0 and second["documents"] == 0
     assert client.post("/admin/reminders/run", headers=login("sme-001@sme.demo")).status_code == 403
 
 

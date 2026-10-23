@@ -2,25 +2,36 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { isProvider, tokenSecondsLeft, type Role } from '../api'
 import { roleLabel, useAuth } from '../auth'
+import { LangSwitch, useT } from '../i18n'
 import { Logo } from '../ui'
+import { Icon } from './Icon'
 import NotificationBell from './NotificationBell'
 
-type NavItem = [path: string, label: string, icon: string]
+const ICON: Record<string, string> = {
+  OV: 'home', PF: 'user', VR: 'shield', DC: 'file', OP: 'search', AP: 'send', CN: 'users', SC: 'lock',
+  PO: 'plus', SL: 'bookmark', SME: 'building', UM: 'unlock', IM: 'chart', RQ: 'inbox', FB: 'award', EC: 'trending',
+}
+const initialsOf = (name: string) => name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
+
+type NavItem = [path: string, label: string, icon: string, more?: boolean]
 
 const NAV: Record<string, NavItem[]> = {
-  sme: [['/app', 'Overview', 'OV'], ['/app/profile', 'Business profile', 'PF'], ['/app/verification', 'Verification', 'VR'],
-    ['/app/documents', 'Documents', 'DC'], ['/app/opportunities', 'Opportunities', 'OP'], ['/app/applications', 'Applications', 'AP'], ['/app/consortia', 'Consortia', 'CN'],
-    ['/app/security', 'Trust & security', 'SC']],
-  provider: [['/app', 'Overview', 'OV'], ['/app/post', 'Post opportunity', 'PO'], ['/app/shortlist', 'Shortlists', 'SL'],
-    ['/app/applications', 'Applications', 'AP'], ['/app/smes', 'Verified SMEs', 'SME'], ['/app/insights', 'Unlock Map', 'UM'], ['/app/impact', 'Impact', 'IM'], ['/app/security', 'Trust & security', 'SC']],
-  admin: [['/app/queue', 'Review queue', 'RQ'], ['/app/security', 'Trust & security', 'SC']],
+  sme: [['/app', 'Home', 'OV'], ['/app/opportunities', 'Opportunities', 'OP'], ['/app/documents', 'Documents', 'DC'],
+    ['/app/applications', 'Applications', 'AP'], ['/app/profile', 'Business profile', 'PF'],
+    ['/app/verification', 'Verification', 'VR', true], ['/app/consortia', 'Consortia', 'CN', true],
+    ['/app/feedback', 'Feedback', 'FB', true], ['/app/security', 'Trust & security', 'SC', true]],
+  provider: [['/app', 'Home', 'OV'], ['/app/post', 'Post opportunity', 'PO'], ['/app/shortlist', 'Shortlists', 'SL'],
+    ['/app/smes', 'Verified SMEs', 'SME'], ['/app/impact', 'Impact', 'IM'],
+    ['/app/applications', 'Applications', 'AP', true], ['/app/insights', 'Unlock Map', 'UM', true],
+    ['/app/feedback', 'Feedback', 'FB', true], ['/app/security', 'Trust & security', 'SC', true]],
+  admin: [['/app/ecosystem', 'Ecosystem', 'EC'], ['/app/queue', 'Review queue', 'RQ'], ['/app/security', 'Trust & security', 'SC', true]],
 }
 
 const TITLES: [string, string][] = [
   ['/app/profile', 'Business profile'], ['/app/verification', 'Verification centre'], ['/app/documents', 'Documents'],
   ['/app/opportunities/', 'Opportunity'], ['/app/opportunities', 'Opportunities'], ['/app/applications', 'Applications'],
   ['/app/post', 'Create opportunity'], ['/app/shortlist', 'Shortlists'], ['/app/smes', 'Verified SMEs'], ['/app/insights', 'Unlock Map'], ['/app/impact', 'Impact report'], ['/app/consortia', 'Consortium invitations'],
-  ['/app/security', 'Trust & security'], ['/app/queue', 'Review queue'], ['/app/matches/', 'Match detail'], ['/app', 'Dashboard'],
+  ['/app/security', 'Trust & security'], ['/app/queue', 'Review queue'], ['/app/ecosystem', 'Ecosystem'], ['/app/feedback', 'Feedback'], ['/app/matches/', 'Match detail'], ['/app', 'Dashboard'],
 ]
 
 function useSessionLeft() {
@@ -42,6 +53,7 @@ export const navFor = (role: Role) => NAV[isProvider(role) ? 'provider' : role]
 
 export default function Shell() {
   const { me, signOut } = useAuth()
+  const t = useT()
   const loc = useLocation()
   const nav = useNavigate()
   const left = useSessionLeft()
@@ -53,23 +65,30 @@ export default function Shell() {
       <aside className="sidebar">
         <Link to="/app" className="brand"><Logo dark /></Link>
         <nav className="side-nav" aria-label="Main">
-          {navFor(me.role).map(([to, label, icon]) => (
+          {navFor(me.role).filter((n) => !n[3]).map(([to, label, icon]) => (
             <NavLink key={to} to={to} end={to === '/app'} className={({ isActive }) => (isActive ? 'active' : '')}>
-              <span className="nav-icon">{icon}</span><span>{label}</span>
+              <span className="nav-icon"><Icon name={ICON[icon] ?? 'sparkles'} size={18} /></span><span>{t(label)}</span>
+            </NavLink>))}
+          {navFor(me.role).some((n) => n[3]) && <div className="nav-more-label">{t('More')}</div>}
+          {navFor(me.role).filter((n) => n[3]).map(([to, label, icon]) => (
+            <NavLink key={to} to={to} className={({ isActive }) => `secondary ${isActive ? 'active' : ''}`}>
+              <span className="nav-icon"><Icon name={ICON[icon] ?? 'sparkles'} size={16} /></span><span>{t(label)}</span>
             </NavLink>))}
         </nav>
         <div className="side-spacer" />
         <div className="side-user">
           <strong>{me.full_name}</strong>
           <small>{me.organisation?.name ?? roleLabel(me.role)}</small>
-          <button className="btn btn-ghost btn-small" style={{ color: '#cbd5e1', paddingLeft: 0 }} onClick={() => { signOut(); nav('/') }}>Sign out</button>
+          <button className="btn btn-ghost btn-small" style={{ color: '#cbd5e1', paddingLeft: 0 }} onClick={() => { signOut(); nav('/') }}>{t('Sign out')}</button>
         </div>
       </aside>
       <main className="app-main">
         <header className="app-header">
-          <h2>{title}</h2>
+          <h2>{t(title)}</h2>
           <div className="header-actions">
+            <LangSwitch />
             <NotificationBell />
+            <span className="avatar" title={me.full_name}>{initialsOf(me.full_name)}</span>
             <span className={`security-chip ${mins !== null && mins <= 5 ? 'warn' : ''}`} title="Access tokens expire after 30 minutes">
               Secure session · {roleLabel(me.role)}{mins !== null ? ` · ${mins} min left` : ''}
             </span>

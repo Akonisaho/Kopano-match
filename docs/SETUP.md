@@ -158,3 +158,86 @@ with two of three accepted. Sign in as `you+buildright@...` and press Accept to 
 
 **Unlock Plan, best first move.** Tick the documents you plan to get and the plan ranks them by contract
 value opened per day of waiting, for example "Best first move: Letter of good standing (COIDA)".
+
+## 12. Feedback, AI reading, ecosystem view and Responsible AI
+
+**Feedback.** After an award, the buyer opens *Feedback* and rates six criteria (quality, delivery,
+responsiveness, compliance, innovation, value for money) with an optional comment. Comments cannot hold
+emails, phone numbers or ID numbers. The business sees every review under *Feedback*, can respond once,
+and can dispute one. A reviewer decides disputes in the *Review queue*: keep it, or remove it (removed
+reviews drop out of every average). Buyers see a business's track record on the match page. Fewer than
+three reviews shows as an "early signal". `build_demo.py` leaves one answered review and one unanswered
+review (Thabo Civils) so you can respond or dispute live.
+
+**Read with AI.** *Documents*, then *Read with AI*. The file goes to Gemini only after the business
+presses the button, the request is audited, and the draft is checked against the account (document
+type, expiry, registration number, company name). Nothing is saved until the person chooses *Use expiry*
+or *Add to my profile*. Use sample documents in the demo.
+
+**Meaning check.** On a match, *Run the meaning check* compares the opportunity text and the
+capabilities by meaning. It is advisory and never changes a score.
+
+**CSV import.** *Post opportunity*, then *Import from your procurement system*. Download the template,
+fill it, press *Check file*, then *Import*. One bad row stops the whole import.
+
+**Closing-soon alerts.** `python scripts/send_reminders.py` (or the admin reminders button) also
+tells good-fit businesses that have not applied when an opportunity closes within 7 days. Each match is
+alerted once.
+
+**Ecosystem (admin).** Sign in as the admin. The landing page is the programme view for YES: funnel,
+sector demand against supply, skills shortfalls, underserved categories, credential gaps, delivery
+ratings. Aggregates only, and counts under three are hidden. The jobs figure uses a placeholder
+coefficient and says so.
+
+**Responsible AI.** `/responsible-ai` is public and computes live from `backend/app/evaluation.py`:
+scenario checks, ranking quality against baselines, determinism, a fairness audit and the limits.
+`docs/MODEL_CARD.md` is the written version.
+
+**Tests never call a real provider.** `backend/tests/conftest.py` forces log email and no AI, whatever
+keys are in `.env`. Run the API for browser testing with `EMAIL_PROVIDER=log` so demo accounts never
+email a real address.
+
+## 13. Semantic search and the procurement-system feed
+
+**Semantic search.** *Opportunities* (business) and *Verified SMEs* (buyer) each have a search box.
+Type what you do or need in your own words. Gemini embeddings (`GEMINI`'s `gemini-embedding-001`,
+set by `EMBEDDING_MODEL`) rank the results by meaning. A business sees its own rule-based position
+beside each result. Similarity says what to look at, never who qualifies, and it falls back to keyword
+overlap when the service is unavailable. The score is stretched for display and is not a probability.
+On a match, the meaning check also shows an embedding similarity.
+
+**Procurement-system feed.** *Post opportunity*, then *Connect your procurement system*. Create a key,
+copy it once, and have your system post to `POST /ingest/opportunities` with the header `X-API-Key`.
+Up to 50 opportunities a call, matched on arrival. Only a hash of the key is stored, a key belongs to
+one organisation, and *Revoke* stops the feed at once. Every call is audited.
+
+**Robustness.** The evaluation also nudges turnover and years trading and reports how stable the
+shortlist stays. CI fails it if the top three overlap drops under 80%.
+
+## 14. The simple home, the Readiness Passport and the two stories
+
+**Business home.** One number (the contract value waiting behind your open documents), one next step, a
+four-step journey, your passport and your best match. Everything else sits under *More* in the sidebar.
+
+**Readiness Passport.** *Home*, then *Create my passport*. It gives a link and a QR code that anyone can
+open without signing in. It shows verified checks with their source (mock sources say so), documents
+and expiry dates, capabilities and an aggregate rating. It never shows turnover, ownership or contact
+details. *New link* kills the old one at once, and *Turn off* hides it.
+
+**Two stories.** The landing page has an interactive pair of stories (a business and a buyer). The dot moves
+when the documents are uploaded. `docs/DEMO.md` is the 2:30 script and `docs/INVESTOR.md` is the investor view.
+
+## 15. Language, voice and assisted sign-up
+
+**Language.** The switcher is in every header (and on the passport page). It saves to the account and to the
+browser. English and Afrikaans are reviewed; isiZulu and Sesotho are marked beta until checked by a first-language
+speaker (see `docs/LANGUAGES.md`). `npm run i18n` checks that every phrase on a page has a translation.
+
+**Voice.** *Listen* reads the next step or the unlock result aloud with a voice installed on the device. The
+microphone on the search boxes speaks to search (in Chrome the audio goes to Google, and the tooltip says so).
+
+**Help a business sign up.** Sign in as `demo+support@kopano-test.com`. The home page has the form. The business
+gets an email to choose its own password; the officer never holds it.
+
+**Inclusion panel.** Sign in as the admin and open the Ecosystem dashboard.
+

@@ -1,6 +1,7 @@
 import { api, dateFmt, pretty } from '../api'
 import { useLoad } from '../hooks'
 import { Badge, Metric, Panel, Spinner, Welcome, useToast } from '../ui'
+import { DisputeQueue } from './Feedback'
 
 export function AdminQueue() {
   const toast = useToast()
@@ -37,6 +38,7 @@ export function AdminQueue() {
             <tr key={x.id}><td><b>{x.sme}</b></td><td>{x.opportunity}</td><td className="mono">{x.fit}</td><td className="mono">{x.readiness}</td><td><small>{x.reason}</small></td><td>{buttons('m', x.id)}</td></tr>))}</tbody>
         </table></div> : <div className="empty"><strong>Nothing waiting</strong></div>}
       </Panel>
+      <DisputeQueue />
     </>
   )
 }

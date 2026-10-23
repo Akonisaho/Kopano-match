@@ -1,7 +1,9 @@
+import { useT } from './i18n'
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Gap, Quadrant, RiskFlags, Verification } from './api'
 import { QUADRANT_BADGE, QUADRANT_LABEL, pretty, zar } from './api'
+import { Icon, iconFor } from './components/Icon'
 
 /* ---------- toasts ---------- */
 interface Toast { id: number; text: string; kind: 'success' | 'error' | 'info' }
@@ -13,7 +15,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const push = useCallback((text: string, kind: Toast['kind'] = 'success') => {
     const id = Date.now() + Math.random()
     setItems((x) => [...x, { id, text, kind }])
-    setTimeout(() => setItems((x) => x.filter((t) => t.id !== id)), 4200)
+    setTimeout(() => setItems((x) => x.filter((t) => t.id !== id)), 3200)
   }, [])
   return (
     <ToastCtx.Provider value={push}>
@@ -55,10 +57,19 @@ export function Badge({ tone, children }: { tone: string; children: ReactNode })
   return <span className={`badge ${tone}`}>{children}</span>
 }
 
-export const QuadrantBadge = ({ q }: { q: Quadrant }) => <Badge tone={QUADRANT_BADGE[q]}>{QUADRANT_LABEL[q]}</Badge>
+export function QuadrantBadge({ q }: { q: Quadrant }) {
+  const t = useT()
+  return <Badge tone={QUADRANT_BADGE[q]}>{t(QUADRANT_LABEL[q])}</Badge>
+}
 
 export function Spinner({ label = 'Loading…' }: { label?: string }) {
-  return <p className="empty" role="status">{label}</p>
+  return (
+    <div className="skeleton-wrap" role="status" aria-label={label}>
+      <div className="skeleton sk-title" />
+      <div className="skeleton-grid"><div className="skeleton sk-card" /><div className="skeleton sk-card" /><div className="skeleton sk-card" /><div className="skeleton sk-card" /></div>
+      <div className="skeleton sk-panel" />
+    </div>
+  )
 }
 
 export function ErrorNote({ error }: { error: string | null }) {
@@ -66,22 +77,35 @@ export function ErrorNote({ error }: { error: string | null }) {
 }
 
 export function Metric({ label, value, note, tone }: { label: string; value: ReactNode; note?: string; tone?: string }) {
-  return <div className="metric"><span>{label}</span><b style={tone ? { color: tone } : undefined}>{value}</b>{note && <small>{note}</small>}</div>
+  return (
+    <div className="metric">
+      <div className="metric-top"><span>{label}</span><i className="metric-icon"><Icon name={iconFor(label)} size={16} /></i></div>
+      <b style={tone ? { color: tone } : undefined}>{value}</b>{note && <small>{note}</small>}
+    </div>
+  )
+}
+
+/** The first sentence, cut short. Context belongs in a glance, not a paragraph. */
+export function brief(text: string, max = 90): string {
+  const first = text.split(/(?<=[.!?])\s/)[0]
+  if (first.length <= max) return first
+  const cut = first.slice(0, max).replace(/\s+\S*$/, '')
+  return `${cut}…`
 }
 
 export function Panel({ title, sub, right, children }: { title?: ReactNode; sub?: string; right?: ReactNode; children: ReactNode }) {
   return (
     <section className="panel">
-      {(title || right) && <div className="panel-head"><div>{title && <h3>{title}</h3>}{sub && <p>{sub}</p>}</div>{right}</div>}
+      {(title || right) && <div className="panel-head"><div>{title && <h3>{title}</h3>}{sub && <p title={sub}>{brief(sub)}</p>}</div>{right}</div>}
       {children}
     </section>
   )
 }
 
-export function Welcome({ eyebrow, title, text, action }: { eyebrow?: string; title: string; text?: string; action?: ReactNode }) {
+export function Welcome({ eyebrow, title, text, action, hero }: { eyebrow?: string; title: string; text?: string; action?: ReactNode; hero?: boolean }) {
   return (
-    <div className="welcome">
-      <div>{eyebrow && <span className="eyebrow dark">{eyebrow}</span>}<h1>{title}</h1>{text && <p>{text}</p>}</div>
+    <div className={`welcome${hero ? ' welcome-hero' : ''}`}>
+      <div>{eyebrow && <span className="eyebrow dark">{eyebrow}</span>}<h1>{title}</h1>{text && <p title={text}>{brief(text, 110)}</p>}</div>
       {action}
     </div>
   )
@@ -121,21 +145,22 @@ export function VerificationRow({ v }: { v: Verification }) {
 }
 
 export function GapCard({ g, blocks }: { g: Gap; blocks?: string[] }) {
+  const t = useT()
   return (
     <div className="gap-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <h4>{g.label}</h4>
-          <p>{g.status === 'expired' ? 'Expired: renew' : 'Missing: obtain'} from {g.issuer}</p>
+          <h4>{t(g.label)}</h4>
+          <p>{g.status === 'expired' ? t('Expired: renew from {issuer}', { issuer: t(g.issuer) }) : t('Missing: obtain from {issuer}', { issuer: t(g.issuer) })}</p>
         </div>
-        <Badge tone={g.mandatory ? 'amber' : 'gray'}>{g.mandatory ? 'Mandatory' : 'Preferred'}</Badge>
+        <Badge tone={g.mandatory ? 'amber' : 'gray'}>{g.mandatory ? t('Mandatory') : t('Preferred')}</Badge>
       </div>
       <dl className="gap-facts">
-        <div><dt>Turnaround</dt><dd>{g.days} days</dd></div>
-        <div><dt>Cost</dt><dd>{zar(g.cost_zar)}</dd></div>
-        <div><dt>Also unlocks</dt><dd>{g.also_unlocks} other {g.also_unlocks === 1 ? 'opportunity' : 'opportunities'}</dd></div>
+        <div><dt>{t('Turnaround')}</dt><dd>{t('{n} days', { n: g.days })}</dd></div>
+        <div><dt>{t('Cost')}</dt><dd>{zar(g.cost_zar)}</dd></div>
+        <div><dt>{t('Also unlocks')}</dt><dd>{g.also_unlocks === 1 ? t('1 other opportunity') : t('{n} other opportunities', { n: g.also_unlocks })}</dd></div>
       </dl>
-      {blocks && blocks.length > 0 && <p className="hint" style={{ marginTop: 10 }}>Currently blocks: {blocks.join(', ')}</p>}
+      {blocks && blocks.length > 0 && <p className="hint" style={{ marginTop: 10 }}>{t('Currently blocks:')} {blocks.join(', ')}</p>}
     </div>
   )
 }

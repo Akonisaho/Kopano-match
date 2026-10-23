@@ -126,6 +126,44 @@ export const api = {
     request<{ status: string; my_response: string }>(`/consortia/${id}/respond`, json('POST', { accept })),
   dossier: (id: string) => request<DossierData>(`/matches/${id}/dossier`),
 
+  feedbackAwaiting: () => request<AwaitingReview[]>('/feedback/awaiting'),
+  feedbackGiven: () => request<FeedbackItem[]>('/feedback/given'),
+  leaveFeedback: (applicationId: string, ratings: Record<string, number>, comment: string) =>
+    request<{ id: string }>(`/feedback/${applicationId}`, json('POST', { ratings, comment: comment || null })),
+  feedbackMine: () => request<{ items: FeedbackItem[]; performance: Performance }>('/feedback/mine'),
+  respondFeedback: (id: string, text: string) => request<unknown>(`/feedback/${id}/respond`, json('POST', { text })),
+  disputeFeedback: (id: string, text: string) => request<unknown>(`/feedback/${id}/dispute`, json('POST', { text })),
+  feedbackDisputes: () => request<FeedbackItem[]>('/feedback/disputes'),
+  resolveFeedback: (id: string, decision: 'uphold' | 'remove', note: string) =>
+    request<unknown>(`/feedback/${id}/resolve`, json('POST', { decision, note })),
+  trackRecord: (smeId: string) => request<Performance>(`/feedback/performance/${smeId}`),
+  readDocument: (id: string) => request<DocReading>(`/documents/${id}/extract`, json('POST')),
+  setExpiry: (id: string, expiry_date: string) => request<Doc>(`/documents/${id}/expiry`, json('PUT', { expiry_date })),
+  semantic: (matchId: string) => request<Semantic>(`/matches/${matchId}/semantic`),
+  profileQuality: () => request<{ flags: { level: string; text: string }[] }>('/smes/me/quality'),
+  ecosystem: () => request<Ecosystem>('/admin/ecosystem'),
+  evaluation: () => request<Evaluation>('/meta/evaluation'),
+  importOpportunities: (file: File, dryRun: boolean) => {
+    const form = new FormData(); form.append('file', file)
+    return request<ImportResult>(`/opportunities/import?dry_run=${dryRun}`, { method: 'POST', body: form })
+  },
+  searchOpportunities: (query: string) => request<SearchResult<OppHit>>('/smes/me/search', json('POST', { query })),
+  searchSmes: (query: string) => request<SearchResult<SmeHit>>('/providers/search', json('POST', { query })),
+  ingestKeys: () => request<IngestKey[]>('/ingest/keys'),
+  createIngestKey: (name: string) => request<IngestKey & { key: string }>('/ingest/keys', json('POST', { name })),
+  revokeIngestKey: (id: string) => request<IngestKey>(`/ingest/keys/${id}/revoke`, json('POST')),
+  passport: () => request<PassportState>('/smes/me/passport'),
+  passportAction: (kind: 'enable' | 'rotate' | 'disable') => request<PassportState>(`/smes/me/passport/${kind}`, json('POST')),
+  publicPassport: (token: string) => request<PassportView>(`/passport/${encodeURIComponent(token)}`),
+  mode: () => request<{ ai: 'local' | 'gemini' | 'anthropic' | 'off'; email: string }>('/meta/mode'),
+  publicOpportunities: () => request<PublicCard[]>('/public/opportunities'),
+  publicOpportunity: (id: string) => request<PublicDetail>(`/public/opportunities/${id}`),
+  publicPreview: (id: string, body: PreviewBody) => request<PublicPreview>(`/public/opportunities/${id}/preview`, json('POST', body)),
+  setLanguage: (language: string) => request<{ language: string }>('/me/language', json('PUT', { language })),
+  voiceUsed: async (feature: 'search' | 'describe' | 'read_aloud') => { await raw('/me/voice', json('POST', { feature })) },
+  assistBusiness: (b: AssistBody) => request<AssistResult>('/assist/businesses', json('POST', b)),
+  importTemplate: async () => (await raw('/opportunities/import/template')).blob(),
+
   queue: () => request<Queue>('/admin/queue'),
   reviewVerification: (id: string, decision: string) =>
     request<unknown>(`/admin/verifications/${id}/review`, json('POST', { decision })),
@@ -143,10 +181,10 @@ export interface NotificationBox {
 }
 export type Role = 'sme' | 'corporate' | 'funder' | 'support' | 'admin'
 export type Quadrant = 'award_now' | 'coachable' | 'ready_weak_fit' | 'develop'
-export type Kind = 'procurement' | 'grant' | 'funding' | 'investor' | 'support'
+export type Kind = 'procurement' | 'grant' | 'funding' | 'training' | 'support'
 
 export interface Me {
-  id: string; email: string; full_name: string; role: Role; mfa_enabled: boolean
+  id: string; email: string; full_name: string; role: Role; mfa_enabled: boolean; language?: string
   organisation: { id: string; name: string; verification_status: string } | null
 }
 export interface Taxonomy {
@@ -308,15 +346,16 @@ export const PROVIDER_ROLES: Role[] = ['corporate', 'funder', 'support']
 export const isProvider = (r: Role) => PROVIDER_ROLES.includes(r)
 
 export const zar = (n: number) => 'R' + Math.round(n).toLocaleString('en-ZA').replace(/ /g, ' ')
+const ACRONYM: Record<string, string> = { ict: 'ICT', bbbee: 'B-BBEE', csd: 'CSD', cidb: 'CIDB' }
 export const pretty = (s: string) =>
-  s.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase()).replace(/Ict/g, 'ICT').replace(/Bbbee/g, 'B-BBEE')
+  s.split('_').map((w, k) => ACRONYM[w.toLowerCase()] ?? (k === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' ')
 export const dateFmt = (s: string | null) =>
   s ? new Date(s).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 export const daysUntil = (s: string | null) =>
   s ? Math.ceil((new Date(s).getTime() - Date.now()) / 86400000) : null
 
 export const KIND_LABEL: Record<Kind, string> = {
-  procurement: 'Procurement', grant: 'Grant', funding: 'Funding', investor: 'Investor', support: 'Business support',
+  procurement: 'Procurement', grant: 'Grant', funding: 'Funding', training: 'Training', support: 'Business support',
 }
 export const QUADRANT_LABEL: Record<Quadrant, string> = {
   award_now: 'Award ready', coachable: 'Coachable', ready_weak_fit: 'Ready, weak fit', develop: 'Develop',
@@ -327,3 +366,112 @@ export const QUADRANT_COLOR: Record<Quadrant, string> = {
 export const QUADRANT_BADGE: Record<Quadrant, string> = {
   award_now: 'purple', coachable: 'amber', ready_weak_fit: 'blue', develop: 'gray',
 }
+
+export interface AwaitingReview { application_id: string; sme: string; opportunity: string; awarded_value: number; awarded_at: string }
+export interface FeedbackItem {
+  id: string; sme: string; provider: string; ratings: Record<string, number>; comment: string | null
+  status: 'published' | 'responded' | 'disputed' | 'upheld' | 'removed'
+  response: string | null; dispute_reason: string | null; resolution_note: string | null; created_at: string
+}
+export interface Performance {
+  reviews: number; reliable: boolean; overall: number | null
+  criteria: { key: string; label: string; average: number | null }[]
+  disputed_open: number; responded: number
+  summary: null | { source: 'ai' | 'figures'; summary: string; strengths: string[]; development_areas: string[] }
+}
+export interface DocReading {
+  source: 'ai' | 'local' | 'unavailable'; provider?: string
+  draft: null | {
+    document_type: string | null; company_name: string | null; registration_number: string | null
+    issuer: string | null; expiry_date: string | null; sector: string | null; province: string | null
+    annual_turnover: number | null; years_trading: number | null; capability_codes: string[]
+  }
+  checks: { level: 'ok' | 'warn' | 'info'; text: string }[]
+}
+export interface Semantic {
+  source: 'ai' | 'local' | 'keywords'; score: number; matched_themes: string[]; concerns: string[]
+  rationale: string; advisory: string; embedding_similarity?: number
+}
+export interface ImportResult { rows: number; created: number; errors: { row: number; error: string }[]; titles: string[] }
+export interface Ecosystem {
+  totals: { businesses: number; youth_owned: number; opportunities: number; open_value: number; matches: number; applications: number; awards: number; awarded_value: number }
+  funnel: { stage: string; count: number }[]
+  sectors: { sector: string; businesses: number | string; opportunities: number | string; value: number; pressure: number }[]
+  provinces: { province: string; businesses: number | string; opportunities: number | string }[]
+  skills: { code: string; label: string; requested: number; businesses: number; shortfall: boolean }[]
+  underserved: { label: string; requested: number; businesses: number }[]
+  credential_gaps: { label: string; matches_blocked: number }[]
+  quadrants: Record<string, number>
+  quality: { reviews: number; criteria: { key: string; label: string; average: number | null }[] }
+  employment: { jobs_potential: number; assumption: string }
+  inclusion: {
+    languages: { language: string; label: string; reviewed: boolean; businesses: number; profile_complete_pct: number | null; applied: number; awarded: number }[]
+    home_language_pct: number; voice_users: number; assisted: number; businesses: number; note: string
+  }
+}
+export interface Evaluation {
+  model_version: string
+  data: { source: string; businesses: number; opportunities: number; personal_data: boolean }
+  scenarios: { passed: number; total: number; items: { name: string; ok: boolean }[] }
+  benchmark: {
+    opportunities: number; businesses: number; rubric: string
+    methods: { method: string; ndcg_at_5: number; precision_at_3: number }[]
+    relevant_pairs: number; relevant_excluded_by_gates: number
+  }
+  determinism: { identical: boolean; fingerprint: string; runs: number }
+  inputs: { business: string[]; opportunity: string[]; free_text: boolean }
+  robustness: { perturbation: string; trials: number; top3_overlap: number; quadrant_stable: number }
+  fairness: {
+    counterfactual_pairs: number; scores_changed_by_ownership: number; disclosed_max_fit_effect: number
+    groups: { group: string; businesses: number; kept_rate: number; award_ready_rate: number }[]
+    disparate_impact: { attribute: string; ratio: number; within_four_fifths: boolean }[]
+    note: string
+  }
+  limitations: string[]; human_oversight: string[]
+}
+
+export interface SearchResult<T> { source: 'embeddings' | 'keywords'; results: T[] }
+export interface OppHit {
+  opportunity_id: string; title: string; kind: Kind; sector: string; province: string; contract_value: number
+  similarity: number; match: null | { match_id: string; quadrant: Quadrant; fit: number; readiness: number }
+}
+export interface SmeHit {
+  sme_id: string; name: string; sector: string; province: string; years_trading: number
+  verification_status: string; similarity: number
+}
+export interface IngestKey { id: string; name: string; prefix: string; created_at: string; last_used_at: string | null; revoked: boolean }
+
+export interface PassportView {
+  name: string; sector: string | null; province: string | null; years_trading: number | null
+  capabilities: string[]; checks: { label: string; ok: boolean; source: string }[]
+  credentials: { label: string; status: string; expires: string | null }[]; credentials_valid: number
+  track_record: { reviews: number; overall: number | null; reliable: boolean }
+  as_of: string; notice: string
+}
+export interface PassportState { enabled: boolean; link: string | null; qr: string | null; preview: PassportView }
+
+export interface PublicCard {
+  id: string; title: string; kind: Kind; sector: string; province: string; contract_value: number
+  deadline: string | null; provider: string | null
+}
+export interface PublicDetail extends PublicCard {
+  description: string | null; duration_months: number; payment_terms_days: number
+  scope: { label: string; value: number }[]
+  requirements: { text: string; mandatory: boolean; kind: string; value: Record<string, unknown>; days?: number; cost_zar?: number }[]
+  preference: string[]
+}
+export interface PreviewBody {
+  sector: string; province: string; years_trading: number; annual_turnover: number
+  capability_codes: string[]; documents: string[]; language?: string
+}
+export interface PublicPreview {
+  gate: 'pass' | 'remediable' | 'fail'; quadrant: Quadrant; fit: number; readiness: number
+  components: Record<string, number>; gaps: Gap[]; risk: RiskFlags; fail_reasons: string[]; summary: string
+  unlock: { days: number; cost_zar: number; documents: number }; stored: false
+}
+
+export interface AssistBody {
+  full_name: string; email: string; organisation_name: string; registration_number: string | null
+  language: string; consent: boolean
+}
+export interface AssistResult { organisation_id: string; email: string; language: string; emailed: boolean; setup_link?: string }

@@ -36,6 +36,7 @@ CATALOGUE = {
     ),
     "CIDB": ("CIDB Grading Certificate", "Contractor grading certificate", "CIDB (demo issuer)"),
 }
+FIXED_EXPIRY = date(2027, 12, 31)
 W, H = 842, 595  # A4 landscape
 NAVY, PURPLE = "0.11 0.13 0.38", "0.49 0.23 0.93"
 
@@ -174,7 +175,8 @@ def main() -> None:
         folder.mkdir(parents=True, exist_ok=True)
         notes = [f"Expiry dates to enter in the upload form for {company}:", ""]
         for code in types:
-            expiry = today - timedelta(days=30) if code in expired else today + timedelta(days=330)
+            # A fixed date, so the certificates never change from one day to the next
+            expiry = today - timedelta(days=30) if code in expired else FIXED_EXPIRY
             (folder / f"{code}.pdf").write_bytes(make_certificate(company, code, expiry))
             notes.append(
                 f"{code}.pdf   expiry {expiry:%Y-%m-%d}"

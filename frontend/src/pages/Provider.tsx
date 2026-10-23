@@ -1,3 +1,5 @@
+import { ImportPanel, IngestPanel, SemanticSearch } from '../components/AiPanels'
+import { AssistPanel } from '../components/AssistPanel'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
@@ -7,15 +9,15 @@ import {
 import { useAuth } from '../auth'
 import { useLoad } from '../hooks'
 import QuadrantChart, { QuadrantLegend } from '../components/QuadrantChart'
-import { Badge, ErrorNote, Explainer, Metric, MiniBar, Panel, QuadrantBadge, Spinner, Welcome, useToast } from '../ui'
+import { Badge, ErrorNote, Explainer, MiniBar, Panel, QuadrantBadge, Spinner, Welcome, useToast } from '../ui'
 
 const QUADS: Quadrant[] = ['award_now', 'coachable', 'ready_weak_fit', 'develop']
 const KINDS_BY_ROLE: Record<string, Kind[]> = {
-  corporate: ['procurement'], funder: ['grant', 'funding', 'investor'], support: ['support'],
+  corporate: ['procurement'], funder: ['grant', 'funding'], support: ['support', 'training'],
 }
 const VALUE_LABEL: Record<Kind, string> = {
   procurement: 'Contract value (R)', grant: 'Grant pool (R)', funding: 'Funding amount (R)',
-  investor: 'Investment amount (R)', support: 'Programme value (R)',
+  training: 'Programme value (R)', support: 'Programme value (R)',
 }
 const FOCUS: Record<string, string> = { corporate: 'Supplier sourcing', funder: 'Funding and investment', support: 'Business support' }
 
@@ -27,19 +29,28 @@ export function ProviderOverview() {
   const opps = useLoad(() => api.opportunities())
   if (!me || !ov.data || !opps.data) return <Spinner />
   const o = ov.data
-  const verified = o.organisation?.verification_status === 'verified'
+  const ready = o.by_quadrant.award_now ?? 0
   const total = Object.values(o.by_quadrant).reduce((a, b) => a + (b ?? 0), 0)
   return (
     <>
-      <Welcome eyebrow={FOCUS[me.role]} title={`${me.organisation?.name ?? 'Your organisation'} workspace`}
-        text="Publish opportunities as rules, then review ranked, explainable SME matches. The system ranks; you decide."
-        action={<Link className="btn btn-primary" to="/app/post">+ Create opportunity</Link>} />
-      <div className="metric-grid">
-        <Metric label="Provider verification" value={verified ? 'Verified' : pretty(o.organisation?.verification_status ?? 'pending')} tone={verified ? '#16a34a' : '#d97706'} note="From the registry check on your organisation" />
-        <Metric label="Active opportunities" value={o.active_opportunities} note={`${o.closing_soon} closing within 14 days`} />
-        <Metric label="Matched SMEs" value={o.matched_smes} note={`${o.high_fit} high-fit matches`} />
-        <Metric label="Shortlisted" value={o.shortlisted} note={o.flagged ? `${o.flagged} flagged for review` : 'Nothing flagged'} />
-      </div>
+      <section className="unlock-hero">
+        <div>
+          <small>{me.organisation?.name ?? 'Your organisation'} · {FOCUS[me.role]}</small>
+          {ready > 0
+            ? <><h1>{ready} ready to award</h1><p>Across {o.active_opportunities} open {o.active_opportunities === 1 ? 'opportunity' : 'opportunities'}.{o.shortlisted > 0 ? ` ${o.shortlisted} shortlisted so far.` : ''}</p></>
+            : <><h1>Post your first opportunity</h1><p>We rank the businesses, with reasons. You decide.</p></>}
+          <div className="table-actions">
+            <Link className="btn btn-light" to="/app/post">+ Create opportunity</Link>
+            {o.shortlisted > 0 && <Link className="btn btn-ghost" style={{ color: '#fff' }} to="/app/shortlist">See shortlist</Link>}
+          </div>
+        </div>
+        <div className="unlock-side hero-stats">
+          <div><b>{o.matched_smes}</b><span>matched</span></div>
+          <div><b>{o.high_fit}</b><span>high fit</span></div>
+          <div><b>{o.closing_soon}</b><span>closing soon</span></div>
+        </div>
+      </section>
+      {me.role === 'support' && <AssistPanel />}
       {total > 0 && (
         <Panel title="Where your matches sit" sub="Across all your opportunities.">
           <div style={{ display: 'flex', height: 14, borderRadius: 8, overflow: 'hidden', background: '#eef2f7' }}>
@@ -130,6 +141,11 @@ export function PostOpportunity() {
   return (
     <>
       <Welcome title="Create an opportunity" text="Requirements are rules, not prose. Each row is a gate (mandatory) or a weighted preference, and that is what makes every match explainable." />
+      <details className="bulk-tools">
+        <summary>Bring in many at once: CSV or your procurement system</summary>
+        <ImportPanel />
+        <IngestPanel />
+      </details>
       <form onSubmit={submit}><Panel title="Opportunity details" right={<Badge tone="green">{FOCUS[role]}</Badge>}>
         <ErrorNote error={error} />
         <details style={{ marginBottom: 18 }}><summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Draft requirements from tender text (optional)</summary>
@@ -305,6 +321,7 @@ export function SmeDirectory() {
   return (
     <>
       <Welcome title="Verified SME directory" text="Businesses that chose to be visible. Verification reflects the checks actually run; ownership details are deliberately not listed here." />
+      <SemanticSearch mode="provider" />
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <input aria-label="Search by name" placeholder="Search by name" value={q} onChange={(e) => setQ(e.target.value)} style={{ border: '1px solid #d7deea', borderRadius: 11, padding: '10px 13px', minWidth: 260 }} />
         <select aria-label="Sector" value={sector} onChange={(e) => setSector(e.target.value)} style={{ border: '1px solid #d7deea', borderRadius: 11, padding: '10px 13px' }}>

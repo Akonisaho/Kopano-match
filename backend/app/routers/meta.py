@@ -112,3 +112,24 @@ def showcase(db: Session = Depends(get_db)):
         "example": example,
         "consortium": group,
     }
+
+
+@router.get("/evaluation")
+def evaluation_report():
+    """The engine's measured behaviour on synthetic data, with its limits. Public by design."""
+    from ..evaluation import evaluate
+
+    return evaluate()
+
+
+@router.get("/mode")
+def mode():
+    """How AI and email are wired right now, so the pages can say so truthfully."""
+    from ..config import settings
+
+    return {
+        "ai": settings.llm_provider
+        if settings.llm_provider == "local" or settings.gemini_api_key
+        else "off",
+        "email": settings.email_provider,
+    }

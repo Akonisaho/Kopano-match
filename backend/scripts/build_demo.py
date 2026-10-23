@@ -47,9 +47,9 @@ SMES = [
         docs={"TCS": "ok", "BBBEE": "ok", "COID": "ok", "CIDB": "ok"},
     ),
     dict(
-        tag="thabo",
-        name="Thabo Civils",
-        owner="Thabo Nkosi",
+        tag="isizwe",
+        name="Isizwe Civil Works",
+        owner="Lerato Mokoena",
         sector="construction",
         province="Gauteng",
         turnover=6_000_000,
@@ -178,6 +178,7 @@ PROVIDERS = [
     dict(
         tag="funder", role="funder", name="Growth Catalyst Fund", owner="Funding Programme Manager"
     ),
+    dict(tag="support", role="support", name="Enterprise Africa", owner="Programme Director"),
 ]
 
 
@@ -253,7 +254,7 @@ OPPORTUNITIES = [
             sector="services",
             province="Gauteng",
             description="Grants of up to R250k for youth-owned businesses. Applicants must be tax compliant.",
-            deadline=str(TODAY + timedelta(days=18)),
+            deadline=str(TODAY + timedelta(days=6)),
             contract_value=250_000,
             duration_months=12,
             payment_terms_days=30,
@@ -266,6 +267,97 @@ OPPORTUNITIES = [
                 req("ownership", {"flag": "youth"}, True, 10),
                 req("min_years", {"years": 1}),
                 req("compliance_doc", {"doc": "TCS"}, True, 10),
+            ],
+        ),
+    ),
+    dict(
+        by="funder",
+        body=dict(
+            kind="funding",
+            title="Working capital facility",
+            sector="construction",
+            province="Gauteng",
+            description="Revolving working capital for contractors with a signed order. Draw down against invoices, repay on payment.",
+            deadline=str(TODAY + timedelta(days=21)),
+            contract_value=1_500_000,
+            duration_months=24,
+            payment_terms_days=30,
+            scope_items=[
+                {"code": "CON-ROADS", "value": 750_000},
+                {"code": "CON-CIVIL", "value": 750_000},
+            ],
+            transformation_gap=[],
+            requirements=[
+                req("min_turnover", {"amount": 2_000_000}, True, 10),
+                req("min_years", {"years": 3}),
+                req("compliance_doc", {"doc": "TCS"}, True, 10),
+            ],
+        ),
+    ),
+    dict(
+        by="support",
+        body=dict(
+            kind="training",
+            title="Tender writing and compliance masterclass",
+            sector="services",
+            province="Gauteng",
+            description="Four weekly workshops: how to read a tender, price it, and keep your compliance documents in order. Certificates on completion.",
+            deadline=str(TODAY + timedelta(days=40)),
+            contract_value=150_000,
+            duration_months=1,
+            payment_terms_days=30,
+            scope_items=[
+                {"code": c, "value": 30_000}
+                for c in ("CON-ROADS", "ICT-DEV", "SVC-CATER", "MFG-FAB", "ICT-NET")
+            ],
+            transformation_gap=["youth"],
+            requirements=[req("min_years", {"years": 1})],
+        ),
+    ),
+    dict(
+        by="support",
+        body=dict(
+            kind="support",
+            title="Supplier readiness accelerator",
+            sector="services",
+            province="Gauteng",
+            description="Six months of mentoring, tax and compliance clinics, and introductions to corporate buyers. Free for accepted businesses.",
+            deadline=str(TODAY + timedelta(days=12)),
+            contract_value=400_000,
+            duration_months=6,
+            payment_terms_days=30,
+            scope_items=[
+                {"code": c, "value": 50_000}
+                for c in ("CON-ROADS", "ICT-DEV", "SVC-CATER", "MFG-FAB")
+            ],
+            transformation_gap=["youth"],
+            requirements=[
+                req("min_years", {"years": 1}),
+                req("compliance_doc", {"doc": "TCS"}, False, 5),
+            ],
+        ),
+    ),
+    dict(
+        by="buyer",
+        body=dict(
+            kind="procurement",
+            title="Managed IT services contract",
+            sector="ict",
+            province="Gauteng",
+            description="Three years of helpdesk, endpoint support and network monitoring for a regional office.",
+            deadline=str(TODAY + timedelta(days=25)),
+            contract_value=1_800_000,
+            duration_months=36,
+            payment_terms_days=30,
+            scope_items=[
+                {"code": "ICT-SUP", "value": 1_000_000},
+                {"code": "ICT-NET", "value": 800_000},
+            ],
+            transformation_gap=["black_women"],
+            requirements=[
+                req("capability", {"code": "ICT-SUP"}, True, 10),
+                req("compliance_doc", {"doc": "TCS"}, True, 10),
+                req("compliance_doc", {"doc": "BBBEE"}, True, 10),
             ],
         ),
     ),
@@ -440,6 +532,47 @@ def main():
                 fail(f"{code} for {s['name']}: {status} {body.get('detail')}")
         print(f"  {i:2}. {s['name']}")
 
+    print("Setting languages, a little voice use, and one assisted sign-up ...")
+    languages = {
+        "Masego Infrastructure": "en",
+        # The live star, Isizwe, starts in English so the switch can be shown on camera
+        "Isizwe Civil Works": "en",
+        "Nomsa Builders": "st",
+        "Sizwe Road Works": "af",
+        "Tumelo Roadworks": "zu",
+        "AgriFresh Processors": "af",
+        "LinkNet Solutions": "en",
+        "BuildRight Contractors": "zu",
+        "Vuyo Catering": "st",
+        "Zanele Fabrication": "zu",
+    }
+    for name, lang in languages.items():
+        if name in stokens:
+            api.call("PUT", "/me/language", stokens[name], body={"language": lang})
+    for name, feature in (
+        ("Isizwe Civil Works", "read_aloud"),
+        ("Tumelo Roadworks", "search"),
+        ("BuildRight Contractors", "read_aloud"),
+        ("Sizwe Road Works", "search"),
+    ):
+        if name in stokens:
+            api.call("POST", "/me/voice", stokens[name], body={"feature": feature})
+    status, body = api.call(
+        "POST",
+        "/assist/businesses",
+        ptoken["support"],
+        body={
+            "full_name": "Khanyi Mthembu",
+            "email": plus(args.email, "bakery"),
+            "organisation_name": "Khanyi Home Bakery",
+            "registration_number": reg(),
+            "language": "zu",
+            "consent": True,
+        },
+    )
+    if status != 201:
+        fail(f"assisted sign-up: {status} {body.get('detail')}")
+
     print("Publishing opportunities and matching ...")
     opp_ids = {}
     for o in OPPORTUNITIES:
@@ -455,21 +588,53 @@ def main():
     by, roads = opp_ids["Provincial roads rehabilitation"]
     _, ranked = api.call("GET", f"/opportunities/{roads}/matches", ptoken[by])
     for row in ranked:
-        if row["sme_name"] in ("Masego Infrastructure", "Thabo Civils"):
+        if row["sme_name"] in ("Masego Infrastructure", "Nomsa Builders"):
             api.call("POST", f"/matches/{row['match_id']}/shortlist", ptoken[by])
         if row["sme_name"] in ("Masego Infrastructure", "Nomsa Builders"):
             api.call("POST", f"/applications/{row['match_id']}", stokens[row["sme_name"]])
 
     print("Recording awards and inviting a consortium ...")
-    # A split award on the roads tender. Thabo still had open document gaps when awarded, which
+    # A split award on the roads tender. Nomsa still had open document gaps when awarded, which
     # is exactly the case a strict "must hold every document" filter would have rejected.
     by_name = {row["sme_name"]: row["match_id"] for row in ranked}
-    for name, value in (("Masego Infrastructure", 2_500_000), ("Thabo Civils", 1_700_000)):
+    for name, value in (("Masego Infrastructure", 2_500_000), ("Nomsa Builders", 1_700_000)):
         status, body = api.call(
             "POST", f"/applications/{by_name[name]}/award", ptoken[by], body={"value": value}
         )
         if status != 200:
             fail(f"award for {name}: {status} {body.get('detail')}")
+    print("Leaving buyer feedback on the awards ...")
+    keys = ("quality", "delivery", "responsiveness", "compliance", "innovation", "value_for_money")
+    reviews = {
+        "Masego Infrastructure": (
+            [5, 5, 4, 5, 4, 5],
+            "Delivered the first phase ahead of schedule and the paperwork was complete.",
+        ),
+        "Nomsa Builders": (
+            [4, 3, 4, 4, 3, 4],
+            "Good quality work, but two milestones slipped by about a week.",
+        ),
+    }
+    _, owed = api.call("GET", "/feedback/awaiting", ptoken[by])
+    for item in owed:
+        if item["sme"] in reviews:
+            scores, comment = reviews[item["sme"]]
+            status, body = api.call(
+                "POST",
+                f"/feedback/{item['application_id']}",
+                ptoken[by],
+                body={"ratings": dict(zip(keys, scores)), "comment": comment},
+            )
+            if status != 201:
+                fail(f"feedback for {item['sme']}: {status} {body.get('detail')}")
+    _, got = api.call("GET", "/feedback/mine", stokens["Masego Infrastructure"])
+    api.call(
+        "POST",
+        f"/feedback/{got['items'][0]['id']}/respond",
+        stokens["Masego Infrastructure"],
+        body={"text": "Thank you. The second phase is already scheduled with the same crew."},
+    )
+    print("  Nomsa Builders has not answered its review yet: respond or dispute it live.")
     by2, agri = opp_ids["Integrated agri-hub build"]
     status, inv = api.call("POST", f"/opportunities/{agri}/consortium/invite", ptoken[by2])
     if status != 201:
@@ -488,6 +653,29 @@ def main():
     print(
         "  BuildRight Contractors has not answered yet: sign in as that account to accept it live."
     )
+
+    print("Warming the AI results so every page opens instantly ...")
+    from concurrent.futures import ThreadPoolExecutor
+
+    jobs = []
+    for _title, (by_role, oid) in opp_ids.items():
+        _, rows = api.call("GET", f"/opportunities/{oid}/matches", ptoken[by_role])
+        for row in rows if isinstance(rows, list) else []:
+            jobs.append((ptoken[by_role], row["match_id"], row["sme_id"]))
+
+    def warm(job):
+        tok, mid, sid = job
+        api.call("GET", f"/matches/{mid}", tok)
+        api.call("GET", f"/matches/{mid}/semantic", tok)
+        api.call("GET", f"/feedback/performance/{sid}", tok)
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        list(pool.map(warm, jobs))
+    api.call(
+        "POST", "/smes/me/search", next(iter(stokens.values())), body={"query": "road construction"}
+    )
+    api.call("POST", "/providers/search", ptoken["buyer"], body={"query": "road construction"})
+    print(f"  {len(jobs)} matches ready.")
 
     print("\nDone. Sign in with password:", args.password)
     for p in PROVIDERS:

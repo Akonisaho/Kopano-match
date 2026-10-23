@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from .. import models as m
 from ..auth import PROVIDER_ROLES, require_role
+from ..schemas import SearchIn
 from ..db import get_db
 from ..services import bottlenecks
 from ..services import impact as impact_report
@@ -180,3 +181,11 @@ def impact_csv(
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="kopano-impact.csv"'},
     )
+
+
+@router.post("/search")
+def search_smes(body: SearchIn, db: Session = Depends(get_db)):
+    """Find visible businesses by describing what you need, ranked by meaning."""
+    from .. import insights
+
+    return insights.search_smes(db, body.query)

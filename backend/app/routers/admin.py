@@ -165,3 +165,11 @@ def run_reminders(db: Session = Depends(get_db)):
     from .. import reminders
 
     return reminders.run(db)
+
+
+@router.get("/ecosystem")
+def ecosystem(db: Session = Depends(get_db)):
+    """The programme view for YES: demand, supply, gaps and outcomes. Aggregates only."""
+    from .. import insights
+
+    return insights.ecosystem(db)

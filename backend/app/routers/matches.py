@@ -1,4 +1,5 @@
 import json
+import threading
 import uuid
 from datetime import UTC, datetime
 
@@ -11,7 +12,9 @@ from .. import models as m
 from .. import notifications
 from ..audit import write_audit
 from ..auth import PROVIDER_ROLES, current_user, require_role
-from ..db import get_db
+from ..config import settings
+from ..db import SessionLocal, get_db
+from ..i18n import rationale as say_in
 from ..llm import client, prompts
 from ..routers.smes import verification_badges
 
@@ -47,6 +50,47 @@ def _rationale(match: m.Match, sme_name: str) -> tuple[str, str]:
     if text:
         return text, "llm"
     return prompts.fallback_rationale(sme_name, facts), "template"
+
+
+def _said(match: m.Match, name: str, lang: str) -> tuple[str, str | None]:
+    """The explanation in the reader's language. English keeps the stored (possibly AI-worded) text;
+    any other language is built from fixed templates, so it translates exactly."""
+    if lang == "en":
+        return match.explanation["rationale"], match.explanation.get("rationale_source")
+    facts = {
+        "fit_score": float(match.fit_score),
+        "readiness_score": float(match.readiness_score),
+        "gaps": match.explanation["gaps"],
+        "risk": match.risk_flags,
+    }
+    return say_in(name, facts, lang), "template"
+
+
+def warm_rationales(org_id: uuid.UUID) -> None:
+    """After a rescore, write the plain-words summary in the background so the next page view is
+    instant. Only with a live AI provider: otherwise the template is quick and nothing is needed."""
+    if not (settings.llm_provider == "gemini" and settings.gemini_api_key):
+        return
+
+    def run() -> None:
+        try:
+            with SessionLocal() as db:
+                for mt in db.scalars(select(m.Match).where(m.Match.sme_id == org_id)):
+                    if "rationale" in (mt.explanation or {}):
+                        continue
+                    org = db.get(m.Organisation, mt.sme_id)
+                    text, source = _rationale(mt, org.name)
+                    mt.explanation = {
+                        **mt.explanation,
+                        "rationale": text,
+                        "rationale_source": source,
+                    }
+                    flag_modified(mt, "explanation")
+                db.commit()
+        except Exception:  # noqa: BLE001 - a warm-up must never matter
+            pass
+
+    threading.Thread(target=run, daemon=True).start()
 
 
 @router.get("/{match_id}/dossier")
@@ -137,6 +181,7 @@ def detail(
         match.explanation = {**match.explanation, "rationale": text, "rationale_source": source}
         flag_modified(match, "explanation")
         db.commit()
+    said = _said(match, org.name, user.language)
     return {
         "match_id": match.id,
         "opportunity": {
@@ -154,8 +199,8 @@ def detail(
         "components": match.explanation["components"],
         "gaps": match.explanation["gaps"],
         "risk_flags": match.risk_flags,
-        "rationale": match.explanation["rationale"],
-        "rationale_source": match.explanation.get("rationale_source"),
+        "rationale": said[0],
+        "rationale_source": said[1],
         "status": match.status,
         "model_version": match.model_version,
     }
@@ -211,3 +256,13 @@ def reject(
     db: Session = Depends(get_db),
 ):
     return _decide(match_id, "rejected", user, db)
+
+
+@router.get("/{match_id}/semantic")
+def semantic_relevance(
+    match_id: uuid.UUID, user: m.User = Depends(current_user), db: Session = Depends(get_db)
+):
+    """Advisory, meaning-based reading of how the opportunity text fits the business."""
+    from .. import insights
+
+    return insights.semantic(db, readable_match(db, user, match_id))

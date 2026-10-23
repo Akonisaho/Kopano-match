@@ -245,11 +245,11 @@ OPP_META = {
         "and equipment. Applicants must be tax compliant and registered on CSD.",
     ),
     "opp-8": (
-        "funder",
-        "investor",
+        "support",
+        "training",
         28,
-        "A cohort for technology SMEs preparing for seed investment: financial "
-        "projections, traction review and investor introductions.",
+        "A training cohort for technology SMEs preparing to scale: financial "
+        "projections, tender writing and compliance workshops.",
     ),
     "opp-9": (
         "support",

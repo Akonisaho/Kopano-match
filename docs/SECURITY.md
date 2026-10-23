@@ -147,3 +147,39 @@ Honest limits: the impact report states ownership in aggregate, which is further
 personal information beyond matching, so the privacy notice says so. A buyer enters the award value
 itself; it is not reconciled against a signed contract. Consortium formation records the businesses'
 agreement to bid together, not a legal agreement between them.
+
+## Feedback, AI reading and ecosystem reporting
+
+| Control | Where | Proven by |
+|---|---|---|
+| Feedback needs an awarded application owned by the buyer, one per award, and comments exclude personal details | `routers/feedback.py`, `schemas.py` | `test_feedback_lifecycle_response_dispute_and_review` |
+| Only the business can respond or dispute; a reviewer decides; removed feedback leaves every average | `routers/feedback.py`, `insights.performance` | the same test |
+| AI reads a document only on a click, the request is audited, and nothing is saved from it | `routers/documents.py` | `test_ai_reads_a_document_for_review_and_checks_it_against_the_account` |
+| The meaning check carries no name, ownership or size and never changes a score | `insights.semantic` | `test_semantic_relevance_is_advisory_cached_and_scoped` |
+| CSV import is all or nothing, size-limited and role-limited | `routers/opportunities.py` | `test_csv_import_is_all_or_nothing_and_alerts_fire_once_per_match` |
+| The ecosystem view is admin-only, aggregate-only and hides counts under three | `insights.ecosystem` | `test_ecosystem_view_is_for_the_programme_owner_and_names_no_one` |
+| Tests cannot reach a real AI or email provider | `tests/conftest.py` | the whole suite |
+
+Honest limits: sending a document to Gemini shares it with a third party, so it is opt-in per document
+and the demo asks for sample files. Feedback is opinion, so it is disputable, never an automatic bar.
+
+| Control | Where | Proven by |
+|---|---|---|
+| Ingest keys are random, hashed at rest, shown once, scoped to one organisation, revocable, and every call is audited | `routers/ingest.py` | `test_procurement_system_feed_with_api_key` |
+| Semantic search embeds only sector, location, years and capabilities, never names or ownership; hidden businesses never appear | `insights.search_smes` | `test_semantic_search_ranks_by_meaning_and_falls_back_to_keywords` |
+
+Honest limit: the text a person types into semantic search is sent to the embedding service. It is not
+stored, and the page says what is compared.
+
+| Control | Where | Proven by |
+|---|---|---|
+| The passport is off until the business turns it on, shows no turnover, ownership or contact details, labels mock checks, and a rotated or disabled link stops working at once | `routers/passport.py` | `test_readiness_passport_is_shared_by_choice_and_exposes_only_safe_facts` |
+
+| Control | Where | Proven by |
+|---|---|---|
+| Language is a preference and never an input to a score; the engine reads no free text | `engine/types.py`, `evaluation.py` | `test_language_is_a_preference_that_never_changes_a_score`, `test_the_engine_reads_no_free_text_and_says_which_inputs_it_does_read` |
+| Assisted sign-up needs the support role, the business's attested consent, and the business sets its own password; the officer never holds it | `routers/inclusion.py` | `test_a_support_programme_can_sign_a_business_up_and_the_business_sets_its_own_password` |
+| Voice use records only that it happened, never audio or words | `routers/inclusion.py` | `test_voice_use_is_counted_without_keeping_anything_said` |
+
+Honest limit: in Chrome, voice search sends audio to Google to be turned into text. The page says so before it is used.
+

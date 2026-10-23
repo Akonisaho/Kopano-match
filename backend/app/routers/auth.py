@@ -138,6 +138,7 @@ def me(user: m.User = Depends(current_user), db: Session = Depends(get_db)):
         "full_name": user.full_name,
         "role": user.role,
         "mfa_enabled": user.totp_enabled,
+        "language": user.language,
         "organisation": {
             "id": org.id,
             "name": org.name,

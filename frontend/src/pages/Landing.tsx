@@ -1,197 +1,144 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { api, zar, type Role, type Showcase } from '../api'
-import { homeFor, useAuth } from '../auth'
-import QuadrantChart from '../components/QuadrantChart'
-import { TRUST } from '../trust'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { api, type Evaluation, type PublicCard, type Role } from '../api'
 import AuthModal from '../components/AuthModal'
-import { Badge, Logo } from '../ui'
+import { Icon } from '../components/Icon'
+import LxTop from '../components/LxTop'
+import UnlockStage from '../components/UnlockStage'
+import { useT } from '../i18n'
+import { ROLES } from '../roles'
+import { OppCard } from './PublicOpps'
 
-const ROLES: { key: Exclude<Role, 'admin'>; label: string; desc: string; points: string[] }[] = [
-  { key: 'sme', label: 'SME', desc: 'Build a verified capability profile, see exactly what stands between you and each opportunity, and apply.',
-    points: ['Readiness gaps with days and rand cost', 'Apply to matched opportunities', 'Your data, exportable and erasable'] },
-  { key: 'corporate', label: 'Corporate / Buyer', desc: 'Post procurement opportunities as rules, and review ranked, explainable SME matches.',
-    points: ['Requirements as weighted rules', 'Capacity-risk flags on every match', 'Consortium proposals when no one SME fits'] },
-  { key: 'funder', label: 'Funder / Investor', desc: 'Publish grants, funding and investment programmes and find investment-ready businesses.',
-    points: ['Ownership and turnover gates', 'Shortlists with audit trail', 'Human decides, system explains'] },
-  { key: 'support', label: 'Business Support', desc: 'Connect SMEs to accelerators, mentoring and development programmes.',
-    points: ['Match on readiness, not just size', 'See common bottlenecks', 'Track who applied and why'] },
+const BUSINESS = [['Verify once', 'Registry, tax and identity checks, each with its source shown.'], ['See the gap', 'Every missing document, with the days and rand to fix it.'], ['Share your passport', 'One link that proves what you can show any buyer.']]
+const BUYER = [['Post as rules', 'Requirements become gates and weighted preferences.'], ['Get a ranked shortlist', 'Two scores each, with reasons, and a warning when a contract is too big.'], ['Award, then rate', 'Structured feedback builds a track record a business can answer.']]
+const EDGE: [string, string, string][] = [
+  ['layers', 'Two scores, not one', 'A strong business with missing paperwork is coachable, never just rejected.'],
+  ['wallet', 'Gaps with a price tag', 'Issuer, days and rand for every missing document.'],
+  ['users', 'We build the team', 'When nobody covers the scope alone, a consortium is assembled.'],
+  ['id', 'A passport that travels', 'Proof the business owns and shares, on or off the platform.'],
+]
+const INCLUSIVE: [string, string][] = [
+  ['Your language', 'English, Afrikaans, isiZulu and Sesotho. Your scores are the same in every language.'],
+  ['Your voice', 'Listen to your next step, or speak to search instead of typing.'],
+  ['With help', 'A support programme can set you up. You still choose your own password.'],
 ]
 
+/** Adds `in` to an element once it scrolls into view, so sections arrive instead of just sitting there. */
+function Reveal({ children, className = '', delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [on, setOn] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof IntersectionObserver === 'undefined') { setOn(true); return }
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setOn(true); io.disconnect() } }, { threshold: 0.18 })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+  return <div ref={ref} className={`lx-reveal ${on ? 'in' : ''} ${className}`} style={{ transitionDelay: `${delay}ms` }}>{children}</div>
+}
 
 export default function Landing({ initialAuth }: { initialAuth?: 'login' | 'signup' }) {
+  const t = useT()
   const [auth, setAuth] = useState<'login' | 'signup' | null>(initialAuth ?? null)
   const [role, setRole] = useState<Exclude<Role, 'admin'>>('sme')
-  const [show, setShow] = useState<Showcase | null>(null)
-  const [slide, setSlide] = useState(0)
-  const { me } = useAuth()
+  const [ev, setEv] = useState<Evaluation | null>(null)
+  const [opps, setOpps] = useState<PublicCard[]>([])
   const nav = useNavigate()
   const open = (mode: 'login' | 'signup', r?: Exclude<Role, 'admin'>) => { if (r) setRole(r); setAuth(mode) }
 
-  useEffect(() => { api.showcase().then(setShow).catch(() => setShow(null)) }, [])
-  useEffect(() => {
-    const t = setInterval(() => setSlide((s) => (s + 1) % 3), 6000)
-    return () => clearInterval(t)
-  }, [])
+  useEffect(() => { api.evaluation().then(setEv).catch(() => setEv(null)) }, [])
+  useEffect(() => { api.publicOpportunities().then(setOpps).catch(() => setOpps([])) }, [])
 
-  const q = (name: string) => show?.chart?.dots.filter((d) => d.quadrant === name).length ?? 0
+  const flipped = ev?.fairness.scores_changed_by_ownership ?? 0
+  const pairs = ev?.fairness.counterfactual_pairs
 
   return (
-    <>
-      <header className="topbar">
-        <Logo />
-        <nav className="topnav"><a href="#how">How it works</a><a href="#different">What's different</a><a href="#trust">Trust &amp; security</a><a href="#users">Who it serves</a></nav>
-        <div className="top-actions">
-          {me ? <button className="btn btn-primary" onClick={() => nav(homeFor(me.role))}>Open workspace</button> : <>
-            <button className="btn btn-ghost" onClick={() => open('login')}>Log in</button>
-            <button className="btn btn-primary" onClick={() => open('signup')}>Create account</button></>}
-        </div>
-      </header>
+    <div className="lx">
+      <LxTop onLogin={() => open('login')} onSignup={() => open('signup')} />
 
       <main>
-        <section className="hero">
-          <div>
-            <span className="eyebrow">Verified SME opportunity ecosystem</span>
-            <h1>The right SME.<br />The right opportunity.<br /><span>Ready to award.</span></h1>
-            <p>Kopano Match connects verified SMEs with procurement, funding, investment and business-support opportunities. Every match shows two things a single score hides: how well the business fits, and how ready it is, with the exact days and rand it takes to close each gap.</p>
-            <div className="hero-actions">
-              <button className="btn btn-primary" onClick={() => open('signup')}>Join Kopano Match</button>
-              <a className="btn btn-outline" href="#different">See what's different</a>
+        <section className="lx-hero">
+          <div className="lx-aurora" aria-hidden><i /><i /><i /></div>
+          <div className="lx-stars" aria-hidden />
+          <div className="lx-hero-copy">
+            <span className="lx-eyebrow">{t('Verified SME opportunity platform')}</span>
+            <h1>{t('Stop losing contracts to')} <em>{t('paperwork.')}</em></h1>
+            <p>{t('Every small business sees what stands between them and the deal: how long it takes, what it costs, and what it unlocks.')}</p>
+            <div className="lx-cta">
+              <Link className="lx-btn lx-btn-gold lx-btn-lg" to="/opportunities">{t('Browse open opportunities')} <Icon name="arrow" size={18} /></Link>
+              <button className="lx-btn lx-btn-ghost lx-btn-lg" onClick={() => open('signup')}>{t('Join free')}</button>
             </div>
-            <div className="trust-line"><span>Rules, not black-box scores</span><span>Costed readiness plans</span><span>Human-reviewed risk flags</span><span>Append-only audit trail</span></div>
           </div>
+          <div className="lx-hero-stage"><UnlockStage /></div>
+          <a className="lx-scroll" href="#proof" aria-label={t('Scroll down')}><span /></a>
+        </section>
 
-          <div className="hero-stage" aria-live="off">
-            <div className={`hero-slide ${slide === 0 ? 'active' : ''}`}>
-              <div className="hero-card">
-                <small className="k">Live from the platform · {show?.chart ? zar(show.chart.contract_value) : 'procurement'} contract</small>
-                <h3 style={{ margin: '4px 0 8px' }}>Fit and readiness, one dot per SME</h3>
-                {show?.chart ? <QuadrantChart dots={show.chart.dots.map((d, i) => ({ key: String(i), ...d }))} /> : <p className="empty">Loading live data…</p>}
-              </div>
+        <section className="lx-proof" id="proof">
+          <Reveal className="lx-proof-item"><b>2</b><span>{t('scores, not one.')}<br />{t('Fit and readiness.')}</span></Reveal>
+          <Reveal className="lx-proof-item" delay={120}><b>R4.2m</b><span>{t('unlocked by two documents')}<br />{t('in our demo.')}</span></Reveal>
+          <Reveal className="lx-proof-item" delay={240}><b>{flipped}</b><span>{t('of {n} scores changed when', { n: pairs ?? '360' })}<br />{t('we flipped ownership.')}</span></Reveal>
+        </section>
+
+        {opps.length > 0 && (
+          <section className="lx-section" id="live">
+            <Reveal><span className="lx-eyebrow">{t('Live now · no sign-up needed')}</span><h2>{t('Open opportunities.')}<br /><em>{t('Check your fit in seconds.')}</em></h2></Reveal>
+            <div className="lx-grid">{opps.slice(0, 3).map((o, i) => <Reveal key={o.id} delay={i * 110}><OppCard o={o} /></Reveal>)}</div>
+            <Reveal><Link className="lx-btn lx-btn-ghost" to="/opportunities" style={{ marginTop: 26 }}>{t('Browse all {n}', { n: opps.length })} <Icon name="arrow" size={16} /></Link></Reveal>
+          </section>)}
+
+        <section className="lx-section" id="how">
+          <Reveal><h2>{t('One journey, two sides.')}</h2></Reveal>
+          <div className="lx-two">
+            {[['For businesses', BUSINESS], ['For buyers and funders', BUYER]].map(([title, steps], side) => (
+              <Reveal key={title as string} className="lx-panel" delay={side * 140}>
+                <h3>{t(title as string)}</h3>
+                {(steps as string[][]).map(([h, d], i) => (
+                  <div className="lx-step" key={h}><b>{i + 1}</b><div><h4>{t(h)}</h4><p>{t(d)}</p></div></div>))}
+              </Reveal>))}
+          </div>
+        </section>
+
+        <section className="lx-section lx-edge" id="edge">
+          <Reveal><span className="lx-eyebrow">{t('Why it wins')}</span><h2>{t('Everyone else says no.')}<br /><em>{t('We say how.')}</em></h2></Reveal>
+          <div className="lx-cards">
+            {EDGE.map(([icon, h, d], i) => (
+              <Reveal key={h} className="lx-card" delay={i * 110}><span className="lx-card-icon"><Icon name={icon} size={26} /></span><h3>{t(h)}</h3><p>{t(d)}</p></Reveal>))}
+          </div>
+        </section>
+
+        <section className="lx-section" id="inclusive">
+          <Reveal><span className="lx-eyebrow">{t('Built for everyone')}</span><h2>{t('Your language should never')}<br /><em>{t('decide who wins.')}</em></h2></Reveal>
+          <div className="lx-cards three">
+            {INCLUSIVE.map(([h, d], i) => (
+              <Reveal key={h} className="lx-card" delay={i * 110}><h3>{t(h)}</h3><p>{t(d)}</p></Reveal>))}
+          </div>
+        </section>
+
+        <section className="lx-trust">
+          <Reveal className="lx-trust-row">
+            <span>{t('Rules, not a black box')}</span><span>{t('Append-only audit log')}</span><span>{t('AI drafts, people decide')}</span><span>{t('Built against POPIA')}</span>
+            <Link to="/responsible-ai">{t('See how we test it')} <Icon name="arrow" size={15} /></Link>
+          </Reveal>
+        </section>
+
+        <section className="lx-final">
+          <div className="lx-aurora small" aria-hidden><i /><i /></div>
+          <Reveal>
+            <h2>{t('Be the business that’s ready.')}</h2>
+            <div className="lx-cta" style={{ justifyContent: 'center' }}>
+              <button className="lx-btn lx-btn-gold lx-btn-lg" onClick={() => open('signup', 'sme')}>{t('I run a business')}</button>
+              <button className="lx-btn lx-btn-ghost lx-btn-lg" onClick={() => open('signup', 'corporate')}>{t('I buy or fund')}</button>
             </div>
-            <div className={`hero-slide ${slide === 1 ? 'active' : ''}`}>
-              <div className="hero-card">
-                <small className="k">Coachable, not discarded</small>
-                <h3 style={{ margin: '4px 0 14px' }}>A conventional filter drops this business</h3>
-                {show?.example ? <>
-                  <div className="score-pair">
-                    <Ring v={show.example.fit} label="Fit" color="#7c3aed" /><Ring v={show.example.readiness} label="Ready" color="#f59e0b" />
-                    <div><b style={{ fontSize: 22, fontFamily: 'Manrope' }}>{show.example.days} days, {zar(show.example.cost_zar)}</b><p className="hint" style={{ margin: '4px 0 0' }}>stands between this SME and award</p></div>
-                  </div>
-                  <div style={{ display: 'grid', gap: 8, marginTop: 18 }}>
-                    {show.example.gaps.map((g) => (
-                      <div key={g.label} className="gap-card" style={{ padding: 12 }}>
-                        <b style={{ fontSize: 13 }}>{g.label}</b>
-                        <p>{g.issuer} · {g.days} days · {zar(g.cost_zar)} · also unlocks {g.also_unlocks} other</p>
-                      </div>))}
-                  </div></> : <p className="empty">Loading live data…</p>}
-              </div>
-            </div>
-            <div className={`hero-slide ${slide === 2 ? 'active' : ''}`}>
-              <div className="hero-card">
-                <small className="k">When no single SME can deliver</small>
-                <h3 style={{ margin: '4px 0 14px' }}>Consortium assembly</h3>
-                {show?.consortium ? <>
-                  <div className="stat-strip" style={{ marginTop: 0 }}>
-                    <div><b>{show.consortium.members}</b><span>SMEs bundled</span></div>
-                    <div><b>{show.consortium.scope_lines}</b><span>scope lines</span></div>
-                    <div><b>{show.consortium.coverage_pct}%</b><span>covered</span></div>
-                    <div><b>{zar(show.consortium.opportunity_value)}</b><span>contract</span></div>
-                  </div>
-                  <div className="callout blue">A greedy set-cover over the scope items bundles up to three SMEs and nominates the most ready as lead. No other SME fit this scope alone.</div></> : <p className="empty">Loading live data…</p>}
-              </div>
-            </div>
-            <div className="hero-controls">{[0, 1, 2].map((i) => (
-              <button key={i} className={`hero-dot ${slide === i ? 'active' : ''}`} onClick={() => setSlide(i)} aria-label={`Show slide ${i + 1}`} />))}</div>
-          </div>
-        </section>
-
-        <section className="section white">
-          <div className="stat-strip" style={{ maxWidth: 900, margin: '0 auto' }}>
-            <div><b>{show?.smes ?? '–'}</b><span>SMEs on the platform</span></div>
-            <div><b>{show?.opportunities ?? '–'}</b><span>open opportunities</span></div>
-            <div><b>{q('award_now')}</b><span>award-ready on the featured contract</span></div>
-            <div><b>{q('coachable')}</b><span>coachable on the featured contract</span></div>
-          </div>
-          <p className="hint" style={{ textAlign: 'center', marginTop: 12 }}>Counts above are read live from the platform's demo data.</p>
-        </section>
-
-        <section className="section" id="how">
-          <div className="section-head"><span>HOW IT WORKS</span><h2>From verified profile to a decision you can defend</h2><p>One journey for SMEs and the organisations that source from them.</p></div>
-          <div className="steps">
-            {[['Profile', 'Structured capability profile: sector, province, turnover, capabilities. No free-text guesswork.'],
-              ['Verify', 'Registry, tax and identity checks through provider adapters, with every source labelled.'],
-              ['Match', 'A gate removes structural mismatches. Fit and readiness are scored by fixed rules.'],
-              ['Improve', 'Every gap shows the issuer, days, rand cost and how many other opportunities it unlocks.'],
-              ['Decide', 'A human shortlists. Every decision is written to a log the application cannot rewrite.']].map(([t, d], i) => (
-              <div className="step" key={t}><b>{i + 1}</b><h3>{t}</h3><p>{d}</p></div>))}
-          </div>
-        </section>
-
-        <section className="section white" id="different">
-          <div className="section-head"><span>WHAT'S DIFFERENT</span><h2>A match you can explain to a procurement committee</h2><p>Most matching tools return one percentage. That hides the decision.</p></div>
-          <div className="cards-4">
-            {[['2', 'Two axes, not one score', 'Fit says how well the business suits the scope. Readiness says whether the paperwork is in order. A high-fit, low-readiness SME is coachable, not rejected.'],
-              ['R', 'Costed readiness plans', 'Each gap names the issuer, turnaround in days, cost in rand, and how many other open opportunities the same document unlocks.'],
-              ['!', 'Capacity-risk flags', 'Overtrading, concentration and working-capital needs are flagged so a contract that could sink a small business is not celebrated as a win.'],
-              ['+', 'Consortium assembly', 'When no single SME covers the scope, the platform bundles up to three SMEs over the line items and proposes a lead.']].map(([i, t, d]) => (
-              <div className="value-card" key={t}><div className="icon">{i}</div><h3>{t}</h3><p>{d}</p></div>))}
-          </div>
-          <div style={{ maxWidth: 980, margin: '34px auto 0' }}>
-            <div className="compare"><div className="table-wrap"><table>
-              <thead><tr><th /><th>Typical matching tool</th><th>Kopano Match</th></tr></thead>
-              <tbody>
-                {[['Score', 'One blended percentage', 'Fit and readiness, plotted'],
-                  ['Blocked SME', 'Filtered out', 'Kept, with a dated, costed plan'],
-                  ['How it decides', 'Opaque or AI-scored', 'Deterministic rules; AI only explains'],
-                  ['Risk to the SME', 'Not considered', 'Overtrading and cash-flow flags'],
-                  ['Audit', 'Editable logs', 'Append-only, enforced by the database']].map(([a, b, c]) => (
-                  <tr key={a}><td><b>{a}</b></td><td>{b}</td><td style={{ color: '#6d28d9', fontWeight: 600 }}>{c}</td></tr>))}
-              </tbody></table></div></div>
-          </div>
-        </section>
-
-        <section className="section" id="trust">
-          <div className="section-head"><span>TRUST &amp; SECURITY</span><h2>Honest about what is built and what is not</h2><p>Each control is marked as in place or on the roadmap. Nothing here is claimed that the code does not do.</p></div>
-          <div className="cards-4">
-            {TRUST.map((c) => (
-              <div className="value-card" key={c.t}><div className="icon">{c.i}</div><h3>{c.t}</h3><p>{c.d}</p>
-                <div className="status"><Badge tone={c.ok ? 'green' : 'amber'}>{c.ok ? 'In place' : 'Roadmap'}</Badge></div></div>))}
-          </div>
-        </section>
-
-        <section className="section white" id="users">
-          <div className="section-head"><span>BUILT FOR THE ECOSYSTEM</span><h2>One platform, four role-specific workspaces</h2></div>
-          <div className="cards-4">
-            {ROLES.map((r) => (
-              <div className="role-card" key={r.key}>
-                <Badge tone="purple">{r.label}</Badge><h3>{r.label}</h3><p>{r.desc}</p>
-                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: '#475467', lineHeight: 1.7 }}>{r.points.map((p) => <li key={p}>{p}</li>)}</ul>
-                <button className="btn btn-outline btn-small" style={{ alignSelf: 'flex-start' }} onClick={() => open('signup', r.key)}>Join as {r.label}</button>
-              </div>))}
-          </div>
-        </section>
-
-        <section className="section navy" id="about">
-          <div className="section-head"><span style={{ color: '#c5b7ff' }}>BUILT BY DIGI DIVA</span><h2>Practical digital infrastructure for SME growth</h2>
-            <p>Kopano Match is developed by Digi Diva, combining product delivery, automation, data, security and SME-focused solution design. It is a working pilot: the specific list of what separates it from an enterprise deployment is published in the repository.</p></div>
+          </Reveal>
         </section>
       </main>
 
-      <footer className="site-footer">
-        <span>© Digi Diva · Kopano Match pilot. Built against POPIA's conditions; not a claim of compliance.</span>
-        <span><a href="/privacy">Privacy notice</a></span>
+      <footer className="lx-foot">
+        <span>{t('© Digi Diva · Kopano Match pilot. Built against POPIA’s conditions; not a claim of compliance.')}</span>
+        <span><Link to="/privacy">{t('Privacy notice')}</Link> · <Link to="/responsible-ai">{t('Responsible AI')}</Link></span>
       </footer>
 
       {auth && <AuthModal mode={auth} role={role} roles={ROLES} setMode={setAuth} setRole={setRole} onClose={() => { setAuth(null); if (window.location.pathname !== '/') nav('/') }} />}
-    </>
-  )
-}
-
-function Ring({ v, label, color }: { v: number; label: string; color: string }) {
-  return (
-    <div className="score-ring" style={{ ['--v' as string]: v, ['--c' as string]: color, width: 84, height: 84 }}>
-      <b style={{ fontSize: 20 }}>{Math.round(v)}<small>{label}</small></b>
     </div>
   )
 }

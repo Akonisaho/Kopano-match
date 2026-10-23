@@ -8,6 +8,7 @@ dated remediation plans, capacity-risk flags and consortium assembly. Pilot buil
 
 Fastest: `.\scripts\dev.ps1 -Empty`, then `python scripts/build_demo.py --email you@gmail.com` from `backend/`.
 New: awards and an impact report, consortium invitations, a fastest-route Unlock Plan (see SETUP.md section 11).
+New: ratings and feedback with dispute, AI document reading, a meaning check, CSV import, closing-soon alerts, a YES ecosystem dashboard and a public Responsible AI page (see SETUP.md section 12 and docs/MODEL_CARD.md).
 Real malware scanning: add `-Scan`. Check the whole system: `python scripts/smoke_test.py` (see SETUP.md).
 Step by step: [docs/SETUP.md](docs/SETUP.md). Keys and email: [docs/KEYS_AND_EMAIL.md](docs/KEYS_AND_EMAIL.md).
 
@@ -19,6 +20,7 @@ cd backend
 pip install -r requirements.txt -r requirements-dev.txt
 python seed.py                       # schema, grants, 40 SMEs, 9 opportunities
 python scripts/check_engine.py       # scored table in the terminal (--assert for CI)
+python scripts/evaluate_engine.py    # ranking quality, determinism and fairness audit (--assert for CI)
 python -m uvicorn app.main:app --port 8000
 cd ../frontend && npm install && npm run dev    # http://localhost:5173
 ```

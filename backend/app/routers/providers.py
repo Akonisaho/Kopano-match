@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from .. import models as m
 from ..auth import PROVIDER_ROLES, require_role
 from ..db import get_db
+from ..services import bottlenecks
 from .applications import application_status
 
 router = APIRouter(
@@ -90,6 +91,12 @@ def verified_smes(db: Session = Depends(get_db)):
         }
         for p, org in rows
     ]
+
+
+@router.get("/bottlenecks")
+def unlock_map(db: Session = Depends(get_db)):
+    """The Unlock Map: the credentials holding back good-fit SMEs, with the value behind each."""
+    return bottlenecks(db)
 
 
 @router.get("/shortlist")

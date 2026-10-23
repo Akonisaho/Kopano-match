@@ -8,6 +8,8 @@ import { MatchDetail, SecurityCentre } from './pages/Shared'
 import { Applications, Documents, Onboarding, SmeOpportunities, SmeOverview, SmeProfilePage, VerificationCentre } from './pages/Sme'
 import { OpportunityDetail, PostOpportunity, ProviderOverview, ShortlistPage, SmeDirectory } from './pages/Provider'
 import { AdminQueue } from './pages/Admin'
+import { Dossier } from './pages/Dossier'
+import { UnlockMap } from './pages/Insights'
 
 function Index() {
   const { me } = useAuth()
@@ -35,6 +37,8 @@ export default function App() {
         <Route path="opportunities/:id" element={<RequireRole roles="provider"><OpportunityDetail /></RequireRole>} />
         <Route path="shortlist" element={<RequireRole roles="provider"><ShortlistPage /></RequireRole>} />
         <Route path="smes" element={<RequireRole roles="provider"><SmeDirectory /></RequireRole>} />
+        <Route path="insights" element={<RequireRole roles="provider"><UnlockMap /></RequireRole>} />
+        <Route path="matches/:id/dossier" element={<Dossier />} />
         <Route path="queue" element={<RequireRole roles={['admin']}><AdminQueue /></RequireRole>} />
         <Route path="matches/:id" element={<MatchDetail />} />
         <Route path="security" element={<SecurityCentre />} />

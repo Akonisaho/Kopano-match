@@ -462,3 +462,42 @@ def test_unlock_plan_moves_the_numbers_using_the_real_rules():
         client.post("/smes/me/simulate", headers=corp, json={"credentials": ["COID"]}).status_code
         == 403
     )
+
+
+# ---- Unlock Map and decision dossier ----
+
+
+def test_unlock_map_aggregates_without_names_and_is_provider_only():
+    corp = login("corporate@kopano.demo")
+    out = client.get("/providers/bottlenecks", headers=corp).json()
+    assert out["rows"] and out["total_value_locked"] > 0
+    top = out["rows"][0]
+    assert top["smes_blocked"] > 0 and top["value_locked"] > 0 and top["days"] > 0
+    values = [r["value_locked"] for r in out["rows"]]
+    assert values == sorted(values, reverse=True)
+    assert "sme" not in str(out).lower().replace("smes", "")  # aggregates only, no names
+    assert (
+        client.get("/providers/bottlenecks", headers=login("sme-001@sme.demo")).status_code == 403
+    )
+
+
+def test_decision_dossier_has_rules_scores_sources_and_frozen_history():
+    corp = login("corporate@kopano.demo")
+    opp = opp_id(corp, "Provincial roads rehabilitation")
+    ranked = client.get(f"/opportunities/{opp}/matches", headers=corp).json()
+    mid = next(r["match_id"] for r in ranked if r["sme_name"] == "Nomsa Builders")
+    client.post(f"/matches/{mid}/shortlist", headers=corp)
+    d = client.get(f"/matches/{mid}/dossier", headers=corp).json()
+    assert d["model_version"] == "v1" and d["rules"] and d["result"]["components"]
+    assert any("mock" in v["source_label"] for v in d["verifications"])
+    decision = [x for x in d["decisions"] if x["action"] == "match_shortlisted"][-1]
+    assert decision["by_role"] == "corporate" and decision["snapshot"]["fit"] == d["result"]["fit"]
+    assert d["matches_decision_snapshot"] is True
+    # The SME it concerns can read it; another SME and a stranger cannot
+    assert (
+        client.get(f"/matches/{mid}/dossier", headers=login("sme-002@sme.demo")).status_code == 200
+    )
+    assert (
+        client.get(f"/matches/{mid}/dossier", headers=login("sme-005@sme.demo")).status_code == 404
+    )
+    assert client.get(f"/matches/{mid}/dossier", headers=register("corporate")).status_code == 404

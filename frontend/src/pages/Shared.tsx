@@ -40,6 +40,7 @@ export function MatchDetail() {
       <Welcome title={d.sme.name} text={`Model ${d.model_version} · ${d.gate === 'pass' ? 'All mandatory requirements met' : 'Mandatory documents outstanding'}`}
         action={<div className="table-actions">
           <button className="btn btn-outline" onClick={() => nav(-1)}>Back</button>
+          <button className="btn btn-outline" onClick={() => nav(`/app/matches/${d.match_id}/dossier`)}>Decision dossier</button>
           {own && !applied && d.status !== 'rejected' && <button className="btn btn-primary" onClick={() => act('apply')}>Apply</button>}
           {own && applied && <Badge tone="blue">Applied</Badge>}
           {isProvider(me.role) && d.status === 'matched' && <>

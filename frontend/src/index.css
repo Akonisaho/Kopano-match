@@ -300,3 +300,15 @@ td small { color: #8590a3; font-size: 11px; }
   .welcome { flex-direction: column; }
   .stat-strip { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* Printing: the decision dossier prints as a clean one-column record */
+.dossier h2 { font: 800 15px Manrope; margin: 22px 0 6px; }
+.dossier p { font-size: 13.5px; line-height: 1.65; }
+@media print {
+  .sidebar, .app-header, .no-print, .toast-root { display: none !important; }
+  .app-shell { display: block; }
+  .app-content { padding: 0; max-width: none; }
+  body { background: #fff; }
+  .dossier h2 { break-after: avoid; }
+  table, .verify-row { break-inside: avoid; }
+}

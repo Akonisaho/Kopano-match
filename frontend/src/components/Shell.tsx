@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { isProvider, tokenSecondsLeft, type Role } from '../api'
 import { roleLabel, useAuth } from '../auth'
+import { LangSwitch, useT } from '../i18n'
 import { Logo } from '../ui'
 import { Icon } from './Icon'
 import NotificationBell from './NotificationBell'
@@ -52,6 +53,7 @@ export const navFor = (role: Role) => NAV[isProvider(role) ? 'provider' : role]
 
 export default function Shell() {
   const { me, signOut } = useAuth()
+  const t = useT()
   const loc = useLocation()
   const nav = useNavigate()
   const left = useSessionLeft()
@@ -65,25 +67,26 @@ export default function Shell() {
         <nav className="side-nav" aria-label="Main">
           {navFor(me.role).filter((n) => !n[3]).map(([to, label, icon]) => (
             <NavLink key={to} to={to} end={to === '/app'} className={({ isActive }) => (isActive ? 'active' : '')}>
-              <span className="nav-icon"><Icon name={ICON[icon] ?? 'sparkles'} size={18} /></span><span>{label}</span>
+              <span className="nav-icon"><Icon name={ICON[icon] ?? 'sparkles'} size={18} /></span><span>{t(label)}</span>
             </NavLink>))}
-          {navFor(me.role).some((n) => n[3]) && <div className="nav-more-label">More</div>}
+          {navFor(me.role).some((n) => n[3]) && <div className="nav-more-label">{t('More')}</div>}
           {navFor(me.role).filter((n) => n[3]).map(([to, label, icon]) => (
             <NavLink key={to} to={to} className={({ isActive }) => `secondary ${isActive ? 'active' : ''}`}>
-              <span className="nav-icon"><Icon name={ICON[icon] ?? 'sparkles'} size={16} /></span><span>{label}</span>
+              <span className="nav-icon"><Icon name={ICON[icon] ?? 'sparkles'} size={16} /></span><span>{t(label)}</span>
             </NavLink>))}
         </nav>
         <div className="side-spacer" />
         <div className="side-user">
           <strong>{me.full_name}</strong>
           <small>{me.organisation?.name ?? roleLabel(me.role)}</small>
-          <button className="btn btn-ghost btn-small" style={{ color: '#cbd5e1', paddingLeft: 0 }} onClick={() => { signOut(); nav('/') }}>Sign out</button>
+          <button className="btn btn-ghost btn-small" style={{ color: '#cbd5e1', paddingLeft: 0 }} onClick={() => { signOut(); nav('/') }}>{t('Sign out')}</button>
         </div>
       </aside>
       <main className="app-main">
         <header className="app-header">
-          <h2>{title}</h2>
+          <h2>{t(title)}</h2>
           <div className="header-actions">
+            <LangSwitch />
             <NotificationBell />
             <span className="avatar" title={me.full_name}>{initialsOf(me.full_name)}</span>
             <span className={`security-chip ${mins !== null && mins <= 5 ? 'warn' : ''}`} title="Access tokens expire after 30 minutes">

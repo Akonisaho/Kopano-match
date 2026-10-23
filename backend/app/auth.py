@@ -18,8 +18,8 @@ ALGORITHM = "HS256"
 PROVIDER_ROLES = ("corporate", "funder", "support")
 KINDS_BY_ROLE = {
     "corporate": ("procurement",),
-    "funder": ("grant", "funding", "investor"),
-    "support": ("support",),
+    "funder": ("grant", "funding"),
+    "support": ("support", "training"),
 }
 
 

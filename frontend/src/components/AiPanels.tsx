@@ -2,13 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, dateFmt, pretty, QUADRANT_LABEL, zar, type Doc, type DocReading, type ImportResult, type OppHit, type Performance, type Semantic, type SmeHit } from '../api'
 import { useLoad } from '../hooks'
+import { useT } from '../i18n'
 import { PerformanceCard } from '../pages/Feedback'
 import { Badge, Modal, Panel, Spinner, useToast } from '../ui'
+import { VoiceButton } from './Voice'
 
 const LEVEL_TONE: Record<string, string> = { ok: 'green', warn: 'amber', info: 'blue' }
 
-/** AI reads one uploaded document. Opt-in per document, checked against the account, saved only on a click. */
+/** One uploaded document is read, checked against the account, and saved only on a click. */
 export function ReadWithAi({ doc, onClose, onChanged, auto }: { doc: Doc; onClose: () => void; onChanged: () => void; auto?: boolean }) {
+  const t = useT()
   const toast = useToast()
   const [busy, setBusy] = useState(false)
   const [res, setRes] = useState<DocReading | null>(null)
@@ -30,12 +33,12 @@ export function ReadWithAi({ doc, onClose, onChanged, auto }: { doc: Doc; onClos
   const here = mode.data?.ai === 'local'
   useEffect(() => { if (auto) run() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   async function useExpiry(d: string) {
-    try { await api.setExpiry(doc.id, d); toast('Expiry date updated.'); onChanged(); onClose() } catch (err) { toast((err as Error).message, 'error') }
+    try { await api.setExpiry(doc.id, d); toast(t('Expiry date updated.')); onChanged(); onClose() } catch (err) { toast((err as Error).message, 'error') }
   }
   async function fillProfile() {
     try {
       const cur = await api.profile()
-      if (!cur.profile || !res?.draft) { toast('Complete your business profile first, then fill it from a document.', 'error'); return }
+      if (!cur.profile || !res?.draft) { toast(t('Complete your business profile first, then fill it from a document.'), 'error'); return }
       const d = res.draft
       await api.saveProfile({
         ...cur.profile,
@@ -45,37 +48,38 @@ export function ReadWithAi({ doc, onClose, onChanged, auto }: { doc: Doc; onClos
         years_trading: d.years_trading ?? cur.profile.years_trading,
         capability_codes: Array.from(new Set([...cur.profile.capability_codes, ...d.capability_codes])),
       })
-      toast('Profile updated from the document.'); onChanged(); onClose()
+      toast(t('Profile updated from the document.')); onChanged(); onClose()
     } catch (err) { toast((err as Error).message, 'error') }
   }
   const d = res?.draft
   const rows: [string, string | number | null | undefined][] = d ? [
     ['Document type', d.document_type], ['Company', d.company_name], ['Registration number', d.registration_number],
-    ['Issuer', d.issuer], ['Expiry date', d.expiry_date ? dateFmt(d.expiry_date) : null], ['Sector', d.sector ? pretty(d.sector) : null],
+    ['Issuer', d.issuer], ['Expiry date', d.expiry_date ? dateFmt(d.expiry_date) : null], ['Sector', d.sector ? t(pretty(d.sector)) : null],
     ['Province', d.province], ['Annual turnover', d.annual_turnover ? `R${d.annual_turnover.toLocaleString('en-ZA')}` : null],
     ['Years trading', d.years_trading], ['Capabilities', d.capability_codes.length ? d.capability_codes.join(', ') : null],
   ] : []
   const hasProfileFacts = !!d && Boolean(d.sector || d.province || d.annual_turnover || d.years_trading || d.capability_codes.length)
   return (
     <Modal small onClose={onClose}><div className="modal-pad">
-      <h3 style={{ margin: '0 0 4px' }}>{here ? `Reading your ${doc.document_type}` : `Read ${doc.document_type} with AI`}</h3>
+      <h3 style={{ margin: '0 0 4px' }}>{here ? t('Reading your {type}', { type: doc.document_type }) : t('Read {type} with AI', { type: doc.document_type })}</h3>
       {!res && <>
-        {busy ? <div className="reading"><i /><span>{here ? 'Reading the document and checking it against your account…' : 'Reading the certificate and checking it against your account…'}</span></div> : <p className="hint">{here ? 'The file is read on this computer and is not sent anywhere. Nothing is saved until you choose to.' : "This sends the file to Google's Gemini service so it can read the text. Use it on sample or non-sensitive documents in this demo. The request is written to your audit log, and nothing is saved until you choose to."}</p>}
+        {busy ? <div className="reading"><i /><span>{t('Reading the document and checking it against your account…')}</span></div>
+          : <p className="hint">{here ? t('The file is read on this computer and is not sent anywhere. Nothing is saved until you choose to.') : t("This sends the file to Google's Gemini service so it can read the text. Use it on sample or non-sensitive documents in this demo. The request is written to your audit log, and nothing is saved until you choose to.")}</p>}
         <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
-          <button className="btn btn-outline" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" disabled={busy} onClick={run}>{busy ? 'Reading…' : 'Read this document'}</button></div></>}
-      {res?.source === 'unavailable' && <><p className="callout amber">{here ? 'There is no readable text in this file (it may be a scan), so nothing was read. Type the details in instead.' : 'The AI reader is not available right now, so nothing was read. Nothing was changed. Try again in a moment.'}</p>
-        <div className="table-actions" style={{ justifyContent: 'flex-end' }}><button className="btn btn-outline" onClick={onClose}>Close</button></div></>}
+          <button className="btn btn-outline" onClick={onClose}>{t('Cancel')}</button>
+          <button className="btn btn-primary" disabled={busy} onClick={run}>{busy ? t('Reading…') : t('Read this document')}</button></div></>}
+      {res?.source === 'unavailable' && <><p className="callout amber">{here ? t('There is no readable text in this file (it may be a scan), so nothing was read. Type the details in instead.') : t('The AI reader is not available right now, so nothing was read. Nothing was changed. Try again in a moment.')}</p>
+        <div className="table-actions" style={{ justifyContent: 'flex-end' }}><button className="btn btn-outline" onClick={onClose}>{t('Close')}</button></div></>}
       {(res?.source === 'ai' || res?.source === 'local') && d && <>
-        <p className="hint" style={{ marginTop: 0 }}>{res.source === 'local' ? 'Read on this computer, nothing sent anywhere. Check it against the document before you use it.' : 'An AI draft. Check it against the document before you use it.'}</p>
-        {filled && <p className="callout green" style={{ margin: '0 0 8px', fontSize: 13 }}><Badge tone="green">Filled in</Badge> Expiry date {dateFmt(filled)}, taken from the document.</p>}
-        {res.checks.map((c, i) => <p key={i} className={`callout ${c.level === 'ok' ? 'green' : c.level === 'warn' ? 'amber' : 'gray'}`} style={{ margin: '0 0 8px', fontSize: 13 }}><Badge tone={LEVEL_TONE[c.level]}>{c.level === 'ok' ? 'Consistent' : c.level === 'warn' ? 'Check' : 'Note'}</Badge> {c.text}</p>)}
+        <p className="hint" style={{ marginTop: 0 }}>{res.source === 'local' ? t('Read on this computer, nothing sent anywhere. Check it against the document before you use it.') : t('An AI draft. Check it against the document before you use it.')}</p>
+        {filled && <p className="callout green" style={{ margin: '0 0 8px', fontSize: 13 }}><Badge tone="green">{t('Filled in')}</Badge> {t('Expiry date {d}, taken from the document.', { d: dateFmt(filled) })}</p>}
+        {res.checks.map((c, i) => <p key={i} className={`callout ${c.level === 'ok' ? 'green' : c.level === 'warn' ? 'amber' : 'gray'}`} style={{ margin: '0 0 8px', fontSize: 13 }}><Badge tone={LEVEL_TONE[c.level]}>{c.level === 'ok' ? t('Consistent') : c.level === 'warn' ? t('Check') : t('Note')}</Badge> {t(c.text)}</p>)}
         <div className="table-wrap" style={{ margin: '12px 0' }}><table><tbody>{rows.map(([k, v]) => (
-          <tr key={k}><td className="hint" style={{ width: 150 }}>{k}</td><td>{v ?? <span className="hint">not stated</span>}</td></tr>))}</tbody></table></div>
+          <tr key={k}><td className="hint" style={{ width: 150 }}>{t(k)}</td><td>{v ?? <span className="hint">{t('not stated')}</span>}</td></tr>))}</tbody></table></div>
         <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
-          {d.expiry_date && String(doc.expiry_date) !== d.expiry_date && <button className="btn btn-outline" onClick={() => useExpiry(d.expiry_date!)}>Use expiry {dateFmt(d.expiry_date)}</button>}
-          {hasProfileFacts && <button className="btn btn-outline" onClick={fillProfile}>Add to my profile</button>}
-          <button className="btn btn-primary" onClick={onClose}>Done</button></div></>}
+          {d.expiry_date && String(doc.expiry_date) !== d.expiry_date && <button className="btn btn-outline" onClick={() => useExpiry(d.expiry_date!)}>{t('Use expiry {d}', { d: dateFmt(d.expiry_date) })}</button>}
+          {hasProfileFacts && <button className="btn btn-outline" onClick={fillProfile}>{t('Add to my profile')}</button>}
+          <button className="btn btn-primary" onClick={onClose}>{t('Done')}</button></div></>}
     </div></Modal>
   )
 }
@@ -167,6 +171,7 @@ export function ImportPanel({ onImported }: { onImported?: () => void }) {
 
 /** Describe it in your own words; results come back by meaning, with the rule-based position beside them. */
 export function SemanticSearch({ mode }: { mode: 'sme' | 'provider' }) {
+  const t = useT()
   const toast = useToast()
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
@@ -181,14 +186,15 @@ export function SemanticSearch({ mode }: { mode: 'sme' | 'provider' }) {
   }
   const isOpp = (h: OppHit | SmeHit): h is OppHit => 'opportunity_id' in h
   return (
-    <Panel title={mode === 'sme' ? 'Find opportunities in your own words' : 'Find businesses in your own words'}
-      sub={mode === 'sme' ? 'Describe what you do or what you are looking for. Results are ranked by meaning, and your eligibility is shown beside each one.'
-        : 'Describe what you need. Only sector, location, years trading and capabilities are compared: no names, size or ownership.'}
-      right={res && <Badge tone={res.source === 'embeddings' ? 'purple' : 'gray'}>{res.source === 'embeddings' ? 'Semantic search' : 'Keyword search'}</Badge>}>
+    <Panel title={mode === 'sme' ? t('Find opportunities in your own words') : t('Find businesses in your own words')}
+      sub={mode === 'sme' ? t('Describe what you do or what you are looking for. Results are ranked by meaning, and your eligibility is shown beside each one.')
+        : t('Describe what you need. Only sector, location, years trading and capabilities are compared: no names, size or ownership.')}
+      right={res && <Badge tone={res.source === 'embeddings' ? 'purple' : 'gray'}>{res.source === 'embeddings' ? t('Semantic search') : t('Keyword search')}</Badge>}>
       <form className="table-actions" style={{ flexWrap: 'nowrap' }} onSubmit={(e) => { e.preventDefault(); go() }}>
         <input style={{ flex: 1, minWidth: 0, border: '1px solid #d7deea', borderRadius: 11, padding: '11px 13px' }} maxLength={500} value={q} onChange={(e) => setQ(e.target.value)}
-          placeholder={mode === 'sme' ? 'e.g. we resurface roads and fix drainage in Gauteng' : 'e.g. a team that can build and maintain rural roads'} />
-        <button className="btn btn-primary" disabled={busy || q.trim().length < 3}>{busy ? 'Searching…' : 'Search'}</button>
+          placeholder={mode === 'sme' ? t('e.g. we resurface roads and fix drainage in Gauteng') : t('e.g. a team that can build and maintain rural roads')} />
+        <VoiceButton onText={setQ} />
+        <button className="btn btn-primary" disabled={busy || q.trim().length < 3}>{busy ? t('Searching…') : t('Search')}</button>
       </form>
       {res && (res.hits.length ? <div style={{ marginTop: 14 }}>{res.hits.map((h) => (
         <div key={isOpp(h) ? h.opportunity_id : h.sme_id} className="metric-row" style={{ alignItems: 'flex-start' }}>
@@ -196,13 +202,13 @@ export function SemanticSearch({ mode }: { mode: 'sme' | 'provider' }) {
             <b>{isOpp(h) ? h.title : h.name}</b>
             <div className="hint">{pretty(h.sector)} · {h.province}{isOpp(h) ? ` · ${zar(h.contract_value)}` : ` · ${h.years_trading} yrs`}</div>
             {isOpp(h) ? (h.match
-              ? <small>Your position: <Link to={`/app/matches/${h.match.match_id}`}>{QUADRANT_LABEL[h.match.quadrant]}</Link> (fit {h.match.fit}, readiness {h.match.readiness})</small>
-              : <small className="hint">Not matched: a mandatory requirement is unmet.</small>)
+              ? <small>{t('Your position:')} <Link to={`/app/matches/${h.match.match_id}`}>{QUADRANT_LABEL[h.match.quadrant]}</Link> (fit {h.match.fit}, readiness {h.match.readiness})</small>
+              : <small className="hint">{t('Not matched: a mandatory requirement is unmet.')}</small>)
               : <Badge tone={h.verification_status === 'verified' ? 'green' : 'amber'}>{h.verification_status === 'verified' ? 'Verified' : 'In review'}</Badge>}
           </div>
           <div style={{ width: 110, flex: '0 0 auto', textAlign: 'right' }}><b className="mono">{h.similarity}%</b><div className="progress" style={{ height: 6 }} aria-hidden><i style={{ width: `${h.similarity}%` }} /></div></div>
         </div>))}
-        <p className="hint" style={{ marginBottom: 0 }}>Similarity says what to look at. It never decides who qualifies.</p></div>
+        <p className="hint" style={{ marginBottom: 0 }}>{t('Similarity says what to look at. It never decides who qualifies.')}</p></div>
         : <p className="hint">Nothing came back.</p>)}
     </Panel>
   )

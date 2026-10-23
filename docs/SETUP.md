@@ -227,3 +227,17 @@ details. *New link* kills the old one at once, and *Turn off* hides it.
 **Two stories.** The landing page has an interactive pair of stories (a business and a buyer). The dot moves
 when the documents are uploaded. `docs/DEMO.md` is the 2:30 script and `docs/INVESTOR.md` is the investor view.
 
+## 15. Language, voice and assisted sign-up
+
+**Language.** The switcher is in every header (and on the passport page). It saves to the account and to the
+browser. English and Afrikaans are reviewed; isiZulu and Sesotho are marked beta until checked by a first-language
+speaker (see `docs/LANGUAGES.md`). `npm run i18n` checks that every phrase on a page has a translation.
+
+**Voice.** *Listen* reads the next step or the unlock result aloud with a voice installed on the device. The
+microphone on the search boxes speaks to search (in Chrome the audio goes to Google, and the tooltip says so).
+
+**Help a business sign up.** Sign in as `demo+support@kopano-test.com`. The home page has the form. The business
+gets an email to choose its own password; the officer never holds it.
+
+**Inclusion panel.** Sign in as the admin and open the Ecosystem dashboard.
+

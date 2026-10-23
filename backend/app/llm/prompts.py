@@ -92,32 +92,11 @@ class RequirementExtraction(BaseModel):
         return [c for c in v if c in CAPABILITIES]
 
 
-def fallback_rationale(sme_name: str, m: dict) -> str:
-    """Template built only from the stored score breakdown."""
-    parts = [
-        f"{sme_name} scores {m['fit_score']} on fit and {m['readiness_score']} on readiness "
-        f"for this opportunity."
-    ]
-    gaps = m["gaps"]
-    if gaps:
-        steps = "; ".join(
-            f"{g['label']} from {g['issuer']} ({g['days']} days, R{g['cost_zar']:,})" for g in gaps
-        )
-        parts.append(f"The award is blocked until these are in place: {steps}.")
-        parts.append(
-            "Once they are, the business moves to the award-ready quadrant."
-            if m["fit_score"] >= 60
-            else "Fit remains below the 60 threshold even after remediation."
-        )
-    else:
-        parts.append("No readiness gaps are open.")
-    r = m["risk"]
-    if r["overtrading"]:
-        parts.append(
-            f"Capacity warning: the contract is {r['overtrading_pct']}% of annual turnover, "
-            f"and R{r['working_capital_zar']:,} of working capital is needed before first payment."
-        )
-    return " ".join(parts)
+def fallback_rationale(sme_name: str, m: dict, lang: str = "en") -> str:
+    """Template built only from the stored score breakdown, in the chosen language."""
+    from ..i18n import rationale
+
+    return rationale(sme_name, m, lang)
 
 
 EXTRACT_DOCUMENT = """You read one business document (a certificate, letter, capability statement or

@@ -295,27 +295,23 @@ OPPORTUNITIES = [
         ),
     ),
     dict(
-        by="funder",
+        by="support",
         body=dict(
-            kind="investor",
-            title="Growth-stage equity round",
-            sector="ict",
-            province="Western Cape",
-            description="Equity for software and infrastructure businesses with proven recurring revenue and a clear path to scale.",
+            kind="training",
+            title="Tender writing and compliance masterclass",
+            sector="services",
+            province="Gauteng",
+            description="Four weekly workshops: how to read a tender, price it, and keep your compliance documents in order. Certificates on completion.",
             deadline=str(TODAY + timedelta(days=40)),
-            contract_value=5_000_000,
-            duration_months=60,
+            contract_value=150_000,
+            duration_months=1,
             payment_terms_days=30,
             scope_items=[
-                {"code": "ICT-DEV", "value": 3_000_000},
-                {"code": "ICT-NET", "value": 2_000_000},
+                {"code": c, "value": 30_000}
+                for c in ("CON-ROADS", "ICT-DEV", "SVC-CATER", "MFG-FAB", "ICT-NET")
             ],
-            transformation_gap=[],
-            requirements=[
-                req("capability", {"code": "ICT-DEV"}, True, 10),
-                req("min_turnover", {"amount": 3_000_000}, True, 10),
-                req("min_years", {"years": 3}),
-            ],
+            transformation_gap=["youth"],
+            requirements=[req("min_years", {"years": 1})],
         ),
     ),
     dict(
@@ -535,6 +531,47 @@ def main():
             if status != 201:
                 fail(f"{code} for {s['name']}: {status} {body.get('detail')}")
         print(f"  {i:2}. {s['name']}")
+
+    print("Setting languages, a little voice use, and one assisted sign-up ...")
+    languages = {
+        "Masego Infrastructure": "en",
+        # The live star, Isizwe, starts in English so the switch can be shown on camera
+        "Isizwe Civil Works": "en",
+        "Nomsa Builders": "st",
+        "Sizwe Road Works": "af",
+        "Tumelo Roadworks": "zu",
+        "AgriFresh Processors": "af",
+        "LinkNet Solutions": "en",
+        "BuildRight Contractors": "zu",
+        "Vuyo Catering": "st",
+        "Zanele Fabrication": "zu",
+    }
+    for name, lang in languages.items():
+        if name in stokens:
+            api.call("PUT", "/me/language", stokens[name], body={"language": lang})
+    for name, feature in (
+        ("Isizwe Civil Works", "read_aloud"),
+        ("Tumelo Roadworks", "search"),
+        ("BuildRight Contractors", "read_aloud"),
+        ("Sizwe Road Works", "search"),
+    ):
+        if name in stokens:
+            api.call("POST", "/me/voice", stokens[name], body={"feature": feature})
+    status, body = api.call(
+        "POST",
+        "/assist/businesses",
+        ptoken["support"],
+        body={
+            "full_name": "Khanyi Mthembu",
+            "email": plus(args.email, "bakery"),
+            "organisation_name": "Khanyi Home Bakery",
+            "registration_number": reg(),
+            "language": "zu",
+            "consent": True,
+        },
+    )
+    if status != 201:
+        fail(f"assisted sign-up: {status} {body.get('detail')}")
 
     print("Publishing opportunities and matching ...")
     opp_ids = {}

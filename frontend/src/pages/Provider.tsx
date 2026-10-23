@@ -1,4 +1,5 @@
 import { ImportPanel, IngestPanel, SemanticSearch } from '../components/AiPanels'
+import { AssistPanel } from '../components/AssistPanel'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
@@ -12,11 +13,11 @@ import { Badge, ErrorNote, Explainer, MiniBar, Panel, QuadrantBadge, Spinner, We
 
 const QUADS: Quadrant[] = ['award_now', 'coachable', 'ready_weak_fit', 'develop']
 const KINDS_BY_ROLE: Record<string, Kind[]> = {
-  corporate: ['procurement'], funder: ['grant', 'funding', 'investor'], support: ['support'],
+  corporate: ['procurement'], funder: ['grant', 'funding'], support: ['support', 'training'],
 }
 const VALUE_LABEL: Record<Kind, string> = {
   procurement: 'Contract value (R)', grant: 'Grant pool (R)', funding: 'Funding amount (R)',
-  investor: 'Investment amount (R)', support: 'Programme value (R)',
+  training: 'Programme value (R)', support: 'Programme value (R)',
 }
 const FOCUS: Record<string, string> = { corporate: 'Supplier sourcing', funder: 'Funding and investment', support: 'Business support' }
 
@@ -49,6 +50,7 @@ export function ProviderOverview() {
           <div><b>{o.closing_soon}</b><span>closing soon</span></div>
         </div>
       </section>
+      {me.role === 'support' && <AssistPanel />}
       {total > 0 && (
         <Panel title="Where your matches sit" sub="Across all your opportunities.">
           <div style={{ display: 'flex', height: 14, borderRadius: 8, overflow: 'hidden', background: '#eef2f7' }}>

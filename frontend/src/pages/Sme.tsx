@@ -8,6 +8,8 @@ import { useAuth } from '../auth'
 import { ProfileHealth, ReadWithAi, SemanticSearch } from '../components/AiPanels'
 import { PassportCard } from '../components/PassportCard'
 import UnlockCelebration, { type Unlocked } from '../components/UnlockCelebration'
+import { ReadAloud } from '../components/Voice'
+import { useT, type T } from '../i18n'
 import { useLoad } from '../hooks'
 import {
   Badge, ErrorNote, Logo, MiniBar, Panel, QuadrantBadge, ScoreRing, Spinner, VerificationRow, Welcome, useToast,
@@ -43,23 +45,29 @@ function nextStep(
   gaps: { label: string; issuer: string; days: number; cost_zar: number; also_unlocks: number; blocks: string[] }[],
   best: { opportunity: string; status: string } | undefined,
   applications: number,
+  t: T,
 ): { title: string; text: string; cta: string; to?: string } {
   if (!p.completion.steps[0].done)
-    return { title: 'Describe what your business delivers', text: 'Your profile is the input to every match. It takes two minutes.', cta: 'Complete profile', to: '/app/profile' }
+    return { title: t('Describe what your business delivers'), text: t('Your profile is the input to every match. It takes two minutes.'), cta: t('Complete profile'), to: '/app/profile' }
   if (!isOk(checks.find((c) => c.key === 'identity')?.v))
-    return { title: 'Run your identity check', text: 'Providers trust verified businesses more. Only the outcome is stored, never the image.', cta: 'Verify identity', to: '/app/verification' }
+    return { title: t('Run your identity check'), text: t('Providers trust verified businesses more. Only the outcome is stored, never the image.'), cta: t('Verify identity'), to: '/app/verification' }
   if (!p.completion.steps[3].done)
-    return { title: 'Upload your first compliance document', text: 'A tax compliance PIN is the most commonly required document.', cta: 'Upload a document', to: '/app/documents' }
+    return { title: t('Upload your first compliance document'), text: t('A tax compliance PIN is the most commonly required document.'), cta: t('Upload a document'), to: '/app/documents' }
   const g = gaps.slice().sort((a, b) => b.also_unlocks - a.also_unlocks || a.days - b.days)[0]
   if (g)
-    return { title: `Get your ${g.label}`, text: `${g.issuer}: about ${g.days} days${g.cost_zar ? ` and ${zar(g.cost_zar)}` : ' at no cost'}. It clears a blocker on ${g.blocks.length} of your matches${g.also_unlocks ? ` and unlocks ${g.also_unlocks} more opportunities` : ''}.`, cta: 'Upload it', to: '/app/documents' }
+    return {
+      title: t('Get your {doc}', { doc: t(g.label) }),
+      text: t('{issuer}: about {days} days, {cost}. It clears a blocker on {n} of your matches.', { issuer: t(g.issuer), days: g.days, cost: g.cost_zar ? zar(g.cost_zar) : t('no cost'), n: g.blocks.length }),
+      cta: t('Upload it'), to: '/app/documents',
+    }
   if (best && applications === 0)
-    return { title: `Apply to ${best.opportunity}`, text: 'You are ready for your best match. Applying takes one click.', cta: 'See opportunities', to: '/app/opportunities' }
-  return { title: 'You are all set', text: 'Keep documents current so you stay award-ready, and watch for new opportunities.', cta: 'Browse opportunities', to: '/app/opportunities' }
+    return { title: t('Apply to {name}', { name: best.opportunity }), text: t('You are ready for your best match. Applying takes one click.'), cta: t('See opportunities'), to: '/app/opportunities' }
+  return { title: t('You are all set'), text: t('Keep documents current so you stay award-ready, and watch for new opportunities.'), cta: t('Browse opportunities'), to: '/app/opportunities' }
 }
 
 export function SmeOverview() {
   const { me } = useAuth()
+  const t = useT()
   const prof = useLoad(() => api.profile())
   const dash = useLoad(() => api.smeDashboard().catch(() => null))
   const apps = useLoad(() => api.applications())
@@ -71,27 +79,30 @@ export function SmeOverview() {
   const checks = latestChecks(p.verifications)
   const done = checks.filter((c) => isOk(c.v)).length
   const best = matches.slice().sort((a, b) => b.fit + b.readiness - (a.fit + a.readiness))[0]
-  const step = nextStep(p, checks, dash.data?.open_gaps ?? [], best, apps.data?.length ?? 0)
+  const step = nextStep(p, checks, dash.data?.open_gaps ?? [], best, apps.data?.length ?? 0, t)
   const first = me?.full_name.split(' ')[0] ?? ''
   const gaps = dash.data?.open_gaps ?? []
   const blocked = new Set(gaps.flatMap((g) => g.blocks))
   const locked = matches.filter((m) => blocked.has(m.opportunity)).reduce((sum, m) => sum + m.contract_value, 0)
   const journey: [string, boolean][] = [
-    ['Profile', p.completion.percent >= 100], ['Verified', done === checks.length],
-    ['Documents in order', gaps.length === 0], ['Applied', (apps.data?.length ?? 0) > 0],
+    [t('Profile'), p.completion.percent >= 100], [t('Verified'), done === checks.length],
+    [t('Documents in order'), gaps.length === 0], [t('Applied'), (apps.data?.length ?? 0) > 0],
   ]
   const firstOpen = journey.findIndex(([, ok]) => !ok)
   return (
     <>
       <section className="unlock-hero">
         <div>
-          <small>{locked > 0 ? `${first}, this is waiting for you` : `Welcome, ${first}`}</small>
+          <small>{locked > 0 ? t('{name}, this is waiting for you', { name: first }) : t('Welcome, {name}', { name: first })}</small>
           {locked > 0
-            ? <><h1>{zar(locked)}</h1><p>of opportunities are one step away. {step.title}.</p></>
-            : <><h1>You are award ready</h1><p>{step.text}</p></>}
-          {step.to && <Link className="btn btn-light" to={step.to}>{step.cta}</Link>}
+            ? <><h1>{zar(locked)}</h1><p>{t('of opportunities are one step away.')} {step.title}.</p></>
+            : <><h1>{t('You are award ready')}</h1><p>{step.text}</p></>}
+          <div className="table-actions">
+            {step.to && <Link className="btn btn-light" to={step.to}>{step.cta}</Link>}
+            <ReadAloud text={locked > 0 ? `${t('{name}, this is waiting for you', { name: first })}. ${zar(locked)} ${t('of opportunities are one step away.')} ${step.title}.` : `${t('You are award ready')}. ${step.text}`} />
+          </div>
         </div>
-        {best && <div className="unlock-side"><ScoreRing value={best.fit} label="Fit" /><ScoreRing value={best.readiness} label="Ready" color="#f59e0b" /></div>}
+        {best && <div className="unlock-side"><ScoreRing value={best.fit} label={t('Fit')} /><ScoreRing value={best.readiness} label={t('Ready')} color="#f59e0b" /></div>}
       </section>
       <ol className="journey" aria-label="Your progress">
         {journey.map(([label, ok], i) => (
@@ -99,23 +110,23 @@ export function SmeOverview() {
       </ol>
       <div className="grid-2">
         <PassportCard />
-        <Panel title="Best match" sub="Highest combined fit and readiness." right={best && <QuadrantBadge q={best.quadrant} />}>
+        <Panel title={t('Best match')} sub={t('Highest combined fit and readiness.')} right={best && <QuadrantBadge q={best.quadrant} />}>
           {best ? <>
             <h4 style={{ margin: '0 0 4px' }}>{best.opportunity}</h4>
-            <p className="hint">{zar(best.contract_value)} · {best.gate === 'pass' ? 'All mandatory requirements met' : 'Mandatory documents outstanding'}</p>
-            <Link className="btn btn-primary btn-full" style={{ marginTop: 12 }} to={`/app/matches/${best.match_id}`}>See why</Link>
-          </> : <div className="empty"><strong>No matches yet</strong>Buyers run matching when they publish an opportunity.</div>}
+            <p className="hint">{zar(best.contract_value)} · {best.gate === 'pass' ? t('All mandatory requirements met') : t('Mandatory documents outstanding')}</p>
+            <Link className="btn btn-primary btn-full" style={{ marginTop: 12 }} to={`/app/matches/${best.match_id}`}>{t('See why')}</Link>
+          </> : <div className="empty"><strong>{t('No matches yet')}</strong>{t('Buyers run matching when they publish an opportunity.')}</div>}
         </Panel>
       </div>
       {dash.data && dash.data.open_gaps.length > 0 && <UnlockPlan gaps={dash.data.open_gaps} />}
-      <Panel title="Top matches" right={<Link className="btn btn-outline btn-small" to="/app/opportunities">All opportunities</Link>}>
+      <Panel title={t('Top matches')} right={<Link className="btn btn-outline btn-small" to="/app/opportunities">{t('All opportunities')}</Link>}>
         {matches.length ? <div className="table-wrap"><table>
-          <thead><tr><th>Opportunity</th><th>Value</th><th>Fit</th><th>Readiness</th><th>Position</th><th /></tr></thead>
+          <thead><tr><th>{t('Opportunity')}</th><th>{t('Value')}</th><th>{t('Fit')}</th><th>{t('Readiness')}</th><th>{t('Position')}</th><th /></tr></thead>
           <tbody>{matches.slice(0, 5).map((m) => (
             <tr key={m.match_id}><td><b>{m.opportunity}</b></td><td>{zar(m.contract_value)}</td>
               <td className="mono">{m.fit}<MiniBar value={m.fit} /></td><td className="mono">{m.readiness}<MiniBar value={m.readiness} /></td>
-              <td><QuadrantBadge q={m.quadrant} /></td><td><Link className="btn btn-outline btn-small" to={`/app/matches/${m.match_id}`}>View</Link></td></tr>))}</tbody>
-        </table></div> : <div className="empty"><strong>No matches yet</strong></div>}
+              <td><QuadrantBadge q={m.quadrant} /></td><td><Link className="btn btn-outline btn-small" to={`/app/matches/${m.match_id}`}>{t('View')}</Link></td></tr>))}</tbody>
+        </table></div> : <div className="empty"><strong>{t('No matches yet')}</strong></div>}
       </Panel>
     </>
   )
@@ -125,6 +136,7 @@ export function SmeOverview() {
 
 /** A what-if. Tick the documents you plan to get; the same rules re-score every opportunity. */
 function UnlockPlan({ gaps }: { gaps: (Gap & { blocks: string[] })[] }) {
+  const t = useT()
   const toast = useToast()
   const [picked, setPicked] = useState<string[]>(() => gaps.map((g) => g.credential))
   const [plan, setPlan] = useState<UnlockResult | null>(null)
@@ -144,33 +156,32 @@ function UnlockPlan({ gaps }: { gaps: (Gap & { blocks: string[] })[] }) {
   const gain = plan ? plan.after.value - plan.before.value : 0
 
   return (
-    <Panel title="Your Unlock Plan" sub="Tick the documents you plan to get. The real rules re-score every opportunity. Nothing is saved." right={<Badge tone="purple">What if</Badge>}>
+    <Panel title={t('Your Unlock Plan')} sub={t('Tick the documents you plan to get. The real rules re-score every opportunity. Nothing is saved.')} right={<Badge tone="purple">{t('What if')}</Badge>}>
       <div className="grid-2" style={{ gridTemplateColumns: '1fr 1.2fr' }}>
         <div>
           {gaps.map((g) => (
             <label key={g.credential} className="check-row" style={{ alignItems: 'center', margin: '0 0 10px', padding: 12, border: '1px solid var(--line)', borderRadius: 12, background: picked.includes(g.credential) ? '#faf5ff' : '#fff' }}>
               <input type="checkbox" checked={picked.includes(g.credential)} onChange={() => toggle(g.credential)} />
-              <span style={{ flex: 1 }}><b>{g.label}</b><br /><small className="hint">{g.issuer} · {g.days} days · {g.cost_zar ? zar(g.cost_zar) : 'no cost'}</small></span>
+              <span style={{ flex: 1 }}><b>{t(g.label)}</b><br /><small className="hint">{t(g.issuer)} · {t('{n} days', { n: g.days })} · {g.cost_zar ? zar(g.cost_zar) : t('no cost')}</small></span>
             </label>))}
         </div>
         <div>
-          {!plan ? <div className="empty">{picked.length ? 'Working it out…' : 'Tick at least one document to see what it unlocks.'}</div> : <>
+          {!plan ? <div className="empty">{picked.length ? t('Working it out…') : t('Tick at least one document to see what it unlocks.')}</div> : <>
             <div className="delta" style={{ opacity: busy ? 0.6 : 1 }}>
-              <small>Contract value you can be awarded</small>
+              <small>{t('Contract value you can be awarded')}</small>
               <div className="delta-row"><span>{zar(plan.before.value)}</span><i>→</i><b>{zar(plan.after.value)}</b>{gain > 0 && <em>+{zar(gain)}</em>}</div>
-              <div className="delta-sub">{plan.before.award_ready} → {plan.after.award_ready} award-ready · {plan.total_days} days · {plan.total_cost_zar ? zar(plan.total_cost_zar) : 'no cost'}</div>
+              <div className="delta-sub">{t('{a} → {b} award-ready · {d} days · {c}', { a: plan.before.award_ready, b: plan.after.award_ready, d: plan.total_days, c: plan.total_cost_zar ? zar(plan.total_cost_zar) : t('no cost') })}</div>
             </div>
             {plan.routes.length > 0 && plan.routes[0].gain_value > 0 && (
               <div className="callout purple" style={{ marginTop: 0, marginBottom: 12, background: '#faf5ff', color: '#4c1d95' }}>
-                <b>Best first move: {plan.routes[0].label}.</b> On its own it opens {zar(plan.routes[0].gain_value)} of contracts in about {plan.routes[0].days} days
-                ({plan.routes[0].issuer}{plan.routes[0].cost_zar ? `, ${zar(plan.routes[0].cost_zar)}` : ', no cost'}).</div>)}
+                <b>{t('Best first move: {doc}.', { doc: t(plan.routes[0].label) })}</b> {t('On its own it opens {v} of contracts in about {d} days ({issuer}, {c}).', { v: zar(plan.routes[0].gain_value), d: plan.routes[0].days, issuer: t(plan.routes[0].issuer), c: plan.routes[0].cost_zar ? zar(plan.routes[0].cost_zar) : t('no cost') })}</div>)}
             {changed.length > 0 ? <div className="table-wrap"><table>
-              <thead><tr><th>Opportunity</th><th>Now</th><th>After</th></tr></thead>
+              <thead><tr><th>{t('Opportunity')}</th><th>{t('Now')}</th><th>{t('After')}</th></tr></thead>
               <tbody>{changed.map((o) => (
                 <tr key={o.opportunity_id}><td><b>{o.title}</b><br /><small>{zar(o.contract_value)}</small></td>
-                  <td>{o.before ? <QuadrantBadge q={o.before.quadrant} /> : <Badge tone="gray">Not matched</Badge>}</td>
-                  <td><QuadrantBadge q={o.after.quadrant} />{o.newly_award_ready && <> <Badge tone="green">Newly award-ready</Badge></>}</td></tr>))}</tbody>
-            </table></div> : <p className="hint">These documents do not change any opportunity's position.</p>}
+                  <td>{o.before ? <QuadrantBadge q={o.before.quadrant} /> : <Badge tone="gray">{t('Not matched')}</Badge>}</td>
+                  <td><QuadrantBadge q={o.after.quadrant} />{o.newly_award_ready && <> <Badge tone="green">{t('Newly award-ready')}</Badge></>}</td></tr>))}</tbody>
+            </table></div> : <p className="hint">{t('These documents do not change the position of any opportunity.')}</p>}
           </>}
         </div>
       </div>
@@ -332,6 +343,7 @@ export function VerificationCentre() {
 /* ------------------------------------------------------------------ documents */
 
 export function DocumentUpload({ tax, onDone, onUploaded }: { tax: Taxonomy; onDone: () => void; onUploaded?: (d: Doc) => void }) {
+  const t = useT()
   const toast = useToast()
   const [type, setType] = useState('TCS')
   const [expiry, setExpiry] = useState('')
@@ -345,7 +357,7 @@ export function DocumentUpload({ tax, onDone, onUploaded }: { tax: Taxonomy; onD
     if (expiry) form.append('expiry_date', expiry)
     try {
       const r = await api.upload(form)
-      toast(r.verification === 'verified' ? 'Document uploaded and checked.' : `Uploaded. Check result: ${pretty(r.verification)}. A reviewer may follow up.`, r.verification === 'verified' ? 'success' : 'info')
+      toast(r.verification === 'verified' ? t('Document uploaded and checked.') : `${t('Uploaded. Check result:')} ${pretty(r.verification)}.`, r.verification === 'verified' ? 'success' : 'info')
       setFile(null); setExpiry(''); onDone(); onUploaded?.(r)
     } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
   }
@@ -353,17 +365,18 @@ export function DocumentUpload({ tax, onDone, onUploaded }: { tax: Taxonomy; onD
     <form onSubmit={submit}>
       <ErrorNote error={error} />
       <div className="form-grid">
-        <div className="field"><label htmlFor="dt">Document type</label><select id="dt" value={type} onChange={(e) => setType(e.target.value)}>{tax.credentials.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}</select></div>
-        <div className="field"><label htmlFor="ex">Expiry date</label><input id="ex" type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /><span className="hint">Expired documents count for 40% of readiness until renewed.</span></div>
+        <div className="field"><label htmlFor="dt">{t('Document type')}</label><select id="dt" value={type} onChange={(e) => setType(e.target.value)}>{tax.credentials.map((c) => <option key={c.code} value={c.code}>{t(c.label)}</option>)}</select></div>
+        <div className="field"><label htmlFor="ex">{t('Expiry date')}</label><input id="ex" type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /><span className="hint">{t('Leave it empty and it is read from the document.')}</span></div>
       </div>
       <label className="upload-zone"><input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-        <b>{file ? file.name : 'Choose a PDF, PNG or JPG'}</b><p>Maximum 5 MB. Type, size and content are checked, and a fingerprint detects reuse across businesses.</p></label>
-      <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={busy || !file}>{busy ? 'Uploading…' : 'Upload securely'}</button>
+        <b>{file ? file.name : t('Choose a PDF, PNG or JPG')}</b><p>{t('Maximum 5 MB. Type, size and content are checked, and a fingerprint detects reuse across businesses.')}</p></label>
+      <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={busy || !file}>{busy ? t('Uploading…') : t('Upload securely')}</button>
     </form>
   )
 }
 
 export function Documents() {
+  const t = useT()
   const toast = useToast()
   const docs = useLoad(() => api.documents())
   const tax = useLoad(() => api.taxonomy())
@@ -391,16 +404,16 @@ export function Documents() {
   if (!tax.data) return <Spinner />
   return (
     <>
-      <Welcome title="Documents" text="Files are security-sensitive evidence. Only your organisation and platform reviewers can open them, through an authenticated link." />
-      <Panel title="Upload a document"><DocumentUpload tax={tax.data} onDone={docs.reload} onUploaded={(d) => { if (mode.data?.ai === 'local') { setAuto(true); setReading(d) } }} /></Panel>
-      <Panel title="Document register" right={<Badge tone="blue">Authenticated access only</Badge>}>
+      <Welcome title={t('Documents')} text={t('Files are security-sensitive evidence. Only your organisation and platform reviewers can open them, through an authenticated link.')} />
+      <Panel title={t('Upload a document')}><DocumentUpload tax={tax.data} onDone={docs.reload} onUploaded={(d) => { if (mode.data?.ai === 'local') { setAuto(true); setReading(d) } }} /></Panel>
+      <Panel title={t('Document register')} right={<Badge tone="blue">{t('Authenticated access only')}</Badge>}>
         {docs.data?.length ? <div className="table-wrap"><table>
-          <thead><tr><th>Type</th><th>Issuer</th><th>Status</th><th>Expiry</th><th>Uploaded</th><th /></tr></thead>
+          <thead><tr><th>{t('Type')}</th><th>{t('Issuer')}</th><th>{t('Status')}</th><th>{t('Expiry')}</th><th>{t('Uploaded')}</th><th /></tr></thead>
           <tbody>{docs.data.map((d) => (
             <tr key={d.id}><td><b>{d.document_type}</b></td><td>{d.issuer}</td>
               <td><Badge tone={d.status === 'valid' ? 'green' : 'amber'}>{pretty(d.status)}</Badge></td>
               <td>{dateFmt(d.expiry_date)}</td><td>{dateFmt(d.uploaded_at)}</td>
-              <td>{d.has_file ? <div className="table-actions"><button className="btn btn-outline btn-small" onClick={() => view(d.id)}>View</button><button className="btn btn-outline btn-small" onClick={() => { setAuto(false); setReading(d) }}>{mode.data?.ai === 'local' ? 'Read it' : 'Read with AI'}</button></div> : <span className="hint">Seeded record</span>}</td></tr>))}</tbody>
+              <td>{d.has_file ? <div className="table-actions"><button className="btn btn-outline btn-small" onClick={() => view(d.id)}>{t('View')}</button><button className="btn btn-outline btn-small" onClick={() => { setAuto(false); setReading(d) }}>{mode.data?.ai === 'local' ? t('Read it') : t('Read with AI')}</button></div> : <span className="hint">Seeded record</span>}</td></tr>))}</tbody>
         </table></div> : <div className="empty"><strong>No documents yet</strong>Upload a tax compliance PIN or B-BBEE affidavit to improve your readiness.</div>}
       </Panel>
       {reading && <ReadWithAi key={reading.id + String(auto)} doc={reading} auto={auto} onClose={() => { setReading(null); checkUnlock() }} onChanged={docs.reload} />}

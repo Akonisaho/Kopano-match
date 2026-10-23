@@ -705,3 +705,125 @@ def test_buyer_and_business_are_told_when_the_last_gap_closes():
         },
     )
     client.post(f"/opportunities/{roads}/match", headers=corp)
+
+
+def test_language_is_a_preference_that_never_changes_a_score():
+    corp = login("corporate@kopano.demo")
+    mid = _match_id(corp, "Provincial roads rehabilitation", "Khaya Earthworks")
+    english = client.get(f"/matches/{mid}", headers=corp).json()
+    assert client.put("/me/language", headers=corp, json={"language": "klingon"}).status_code == 422
+    try:
+        assert (
+            client.put("/me/language", headers=corp, json={"language": "af"}).json()["language"]
+            == "af"
+        )
+        assert client.get("/me", headers=corp).json()["language"] == "af"
+        af = client.get(f"/matches/{mid}", headers=corp).json()
+        assert "behaal" in af["rationale"] and af["rationale_source"] == "template"
+        # The numbers are identical whatever the language
+        for key in ("fit", "readiness", "gate", "quadrant"):
+            assert af[key] == english[key]
+        assert af["gaps"] == english["gaps"]
+    finally:
+        client.put("/me/language", headers=corp, json={"language": "en"})
+
+    body = {
+        "sector": "construction",
+        "province": "Gauteng",
+        "years_trading": 8,
+        "annual_turnover": 9_000_000,
+        "capability_codes": ["CON-ROADS"],
+        "documents": [],
+    }
+    roads = opp_id(corp, "Provincial roads rehabilitation")
+    en = client.post(f"/public/opportunities/{roads}/preview", json=body).json()
+    zu = client.post(
+        f"/public/opportunities/{roads}/preview", json={**body, "language": "zu"}
+    ).json()
+    assert (en["fit"], en["readiness"], en["quadrant"]) == (
+        zu["fit"],
+        zu["readiness"],
+        zu["quadrant"],
+    )
+    assert en["summary"] != zu["summary"] and "linamaphuzu" in zu["summary"]
+
+
+def test_voice_use_is_counted_without_keeping_anything_said():
+    sme = register("sme")
+    assert client.post("/me/voice", headers=sme, json={"feature": "search"}).status_code == 204
+    assert client.post("/me/voice", headers=sme, json={"feature": "read_aloud"}).status_code == 204
+    assert client.post("/me/voice", headers=sme, json={"feature": "transcript"}).status_code == 422
+    actions = [a["action"] for a in client.get("/me/audit", headers=sme).json()]
+    assert actions.count("voice_used") == 2
+
+
+def test_a_support_programme_can_sign_a_business_up_and_the_business_sets_its_own_password():
+    from app.adapters.email import OUTBOX
+
+    officer = login("support@kopano.demo")
+    n = uuid.uuid4().hex[:8]
+    body = {
+        "full_name": "Sipho Dube",
+        "email": f"{n}@kopano-test.com",
+        "organisation_name": f"Assisted {n}",
+        "registration_number": f"2021/{int(n, 16) % 900000 + 100000}/06",
+        "language": "zu",
+        "consent": True,
+    }
+    assert (
+        client.post("/assist/businesses", headers=login("sme-001@sme.demo"), json=body).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            "/assist/businesses", headers=login("corporate@kopano.demo"), json=body
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            "/assist/businesses", headers=officer, json={**body, "consent": False}
+        ).status_code
+        == 422
+    )
+
+    made = client.post("/assist/businesses", headers=officer, json=body)
+    assert made.status_code == 201, made.text
+    assert (
+        client.post("/assist/businesses", headers=officer, json=body).status_code == 409
+    )  # same email again
+    assert any(e["to"] == body["email"] and "ready" in e["subject"] for e in OUTBOX)
+
+    # The business chooses its own password from the emailed link; the officer never holds it
+    token = made.json()["setup_link"].split("token=")[1]
+    new = "a-brand-new-long-password"
+    assert client.post("/auth/reset", json={"token": token, "new_password": new}).status_code == 200
+    me = client.post("/auth/login", data={"username": body["email"], "password": new})
+    assert me.status_code == 200
+    headers = {"Authorization": f"Bearer {me.json()['access_token']}"}
+    info = client.get("/me", headers=headers).json()
+    assert info["language"] == "zu" and info["role"] == "sme"
+    assert "assisted_signup" in [
+        a["action"] for a in client.get("/me/audit", headers=officer).json()
+    ]
+
+    admin = login("admin@kopano.demo")
+    inc = client.get("/admin/ecosystem", headers=admin).json()["inclusion"]
+    assert inc["assisted"] >= 1 and {r["language"] for r in inc["languages"]} == {
+        "en",
+        "af",
+        "zu",
+        "st",
+    }
+    assert "never enters a score" in inc["note"]
+
+
+def test_the_engine_reads_no_free_text_and_says_which_inputs_it_does_read():
+    e = client.get("/meta/evaluation").json()
+    assert e["inputs"]["free_text"] is False
+    assert {"sector", "province", "turnover", "capability_codes", "documents"} <= set(
+        e["inputs"]["business"]
+    )
+    assert not {"description", "bio", "language", "notes"} & set(
+        e["inputs"]["business"] + e["inputs"]["opportunity"]
+    )

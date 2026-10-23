@@ -1,3 +1,4 @@
+import { useT } from './i18n'
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Gap, Quadrant, RiskFlags, Verification } from './api'
@@ -56,7 +57,10 @@ export function Badge({ tone, children }: { tone: string; children: ReactNode })
   return <span className={`badge ${tone}`}>{children}</span>
 }
 
-export const QuadrantBadge = ({ q }: { q: Quadrant }) => <Badge tone={QUADRANT_BADGE[q]}>{QUADRANT_LABEL[q]}</Badge>
+export function QuadrantBadge({ q }: { q: Quadrant }) {
+  const t = useT()
+  return <Badge tone={QUADRANT_BADGE[q]}>{t(QUADRANT_LABEL[q])}</Badge>
+}
 
 export function Spinner({ label = 'Loading…' }: { label?: string }) {
   return (
@@ -141,21 +145,22 @@ export function VerificationRow({ v }: { v: Verification }) {
 }
 
 export function GapCard({ g, blocks }: { g: Gap; blocks?: string[] }) {
+  const t = useT()
   return (
     <div className="gap-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
         <div>
-          <h4>{g.label}</h4>
-          <p>{g.status === 'expired' ? 'Expired: renew' : 'Missing: obtain'} from {g.issuer}</p>
+          <h4>{t(g.label)}</h4>
+          <p>{g.status === 'expired' ? t('Expired: renew from {issuer}', { issuer: t(g.issuer) }) : t('Missing: obtain from {issuer}', { issuer: t(g.issuer) })}</p>
         </div>
-        <Badge tone={g.mandatory ? 'amber' : 'gray'}>{g.mandatory ? 'Mandatory' : 'Preferred'}</Badge>
+        <Badge tone={g.mandatory ? 'amber' : 'gray'}>{g.mandatory ? t('Mandatory') : t('Preferred')}</Badge>
       </div>
       <dl className="gap-facts">
-        <div><dt>Turnaround</dt><dd>{g.days} days</dd></div>
-        <div><dt>Cost</dt><dd>{zar(g.cost_zar)}</dd></div>
-        <div><dt>Also unlocks</dt><dd>{g.also_unlocks} other {g.also_unlocks === 1 ? 'opportunity' : 'opportunities'}</dd></div>
+        <div><dt>{t('Turnaround')}</dt><dd>{t('{n} days', { n: g.days })}</dd></div>
+        <div><dt>{t('Cost')}</dt><dd>{zar(g.cost_zar)}</dd></div>
+        <div><dt>{t('Also unlocks')}</dt><dd>{g.also_unlocks === 1 ? t('1 other opportunity') : t('{n} other opportunities', { n: g.also_unlocks })}</dd></div>
       </dl>
-      {blocks && blocks.length > 0 && <p className="hint" style={{ marginTop: 10 }}>Currently blocks: {blocks.join(', ')}</p>}
+      {blocks && blocks.length > 0 && <p className="hint" style={{ marginTop: 10 }}>{t('Currently blocks:')} {blocks.join(', ')}</p>}
     </div>
   )
 }

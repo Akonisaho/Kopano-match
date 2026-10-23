@@ -32,7 +32,13 @@ moves as you tick. Open **How the platform decided**. *"Anyone can check their f
    *"Seconds, not weeks. And the buyer already knows."*
 5. **Home:** "You are award ready." Create the **passport**, open the QR on your phone. *"One link that proves what she can show any buyer, on or off the platform."*
 
-## 1:30 to 2:10. The buyer hears about it (`demo+buyer@…`)
+## 1:20 to 1:35. Your language, your voice
+On the business home, open the language switcher and choose **Afrikaans**. The whole screen changes, including the
+plain-words explanation, and the numbers stay identical. Press **Listen**. *"Her scores never change with her language.
+That is the point: how she speaks must not decide whether she wins."* (isiZulu and Sesotho are drafts: keep them for after a
+native speaker has checked them, and switch back to English before the buyer story.)
+
+## 1:35 to 2:10. The buyer hears about it (`demo+buyer@…`)
 1. Open the bell: **Now award ready: Isizwe Civil Works** and **New application**. *"No chasing, no spreadsheets."*
 2. **Roads tender:** the ranked list, Isizwe near the top. Open her match: the two scores, the plain-words summary, the track record.
 3. **Impact:** *"R1.7m went to Nomsa Builders while she still had a document gap. A strict filter would have rejected her. We coached her instead."*
@@ -40,7 +46,7 @@ moves as you tick. Open **How the platform decided**. *"Anyone can check their f
 
 ## 2:10 to 2:30. Proof and ask
 Open **Responsible AI**: *"Flip ownership and zero scores change. Same input, same answer, tested. We even show our one fairness gap."*
-Five seconds on the **Ecosystem** dashboard for YES. Close on the ask.
+Ten seconds on the **Ecosystem** dashboard for YES: the **Inclusion** panel shows how many businesses work in a home language, voice use, and that it costs them nothing at award. Close on the ask.
 
 ## Practising
 Reset (about a minute) before every pass:

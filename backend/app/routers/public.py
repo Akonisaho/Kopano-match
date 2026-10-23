@@ -20,6 +20,7 @@ from ..db import get_db
 from ..engine.runner import match_one
 from ..engine.taxonomy import CAPABILITIES, COMPLIANCE_CATALOGUE, PROVINCES, SECTORS
 from ..engine.types import SME, DocStatus
+from ..i18n import PHRASES
 from ..llm import prompts
 from ..schemas import Strict
 from ..services import explanation_of, load_open_opportunities, risk_of
@@ -53,6 +54,7 @@ class PreviewIn(Strict):
     largest_past_contract: float = Field(default=0, ge=0, le=1e10)
     capability_codes: list[str] = Field(default_factory=list, max_length=15)
     documents: list[str] = Field(default_factory=list, max_length=10)
+    language: Literal["en", "af", "zu", "st"] = "en"
 
     @field_validator("capability_codes")
     @classmethod
@@ -75,7 +77,7 @@ def _cap(code: str) -> str:
 
 def _requirement(r: m.OpportunityRequirement) -> dict:
     t, v = r.requirement_type, r.requirement_value
-    out = {"mandatory": r.mandatory, "kind": t}
+    out = {"mandatory": r.mandatory, "kind": t, "value": v}
     if t == "capability":
         out["text"] = f"Can deliver {_cap(v['code']).lower()}"
     elif t in ("compliance_doc", "certification"):
@@ -187,9 +189,11 @@ def preview(opp_id: uuid.UUID, body: PreviewIn, request: Request, db: Session = 
         "gaps": expl["gaps"],
         "risk": risk,
         "fail_reasons": r.fail_reasons,
-        "summary": prompts.fallback_rationale("Your business", facts)
+        "summary": prompts.fallback_rationale(
+            PHRASES[body.language]["your_business"], facts, body.language
+        )
         if r.gate.value != "fail"
-        else "Not eligible: " + "; ".join(r.fail_reasons),
+        else PHRASES[body.language]["not_eligible"] + ": " + "; ".join(r.fail_reasons),
         "unlock": {
             "days": max((g["days"] for g in mandatory), default=0),
             "cost_zar": sum(g["cost_zar"] for g in mandatory),

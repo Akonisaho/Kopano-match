@@ -14,6 +14,7 @@ from ..audit import write_audit
 from ..auth import PROVIDER_ROLES, current_user, require_role
 from ..config import settings
 from ..db import SessionLocal, get_db
+from ..i18n import rationale as say_in
 from ..llm import client, prompts
 from ..routers.smes import verification_badges
 
@@ -49,6 +50,20 @@ def _rationale(match: m.Match, sme_name: str) -> tuple[str, str]:
     if text:
         return text, "llm"
     return prompts.fallback_rationale(sme_name, facts), "template"
+
+
+def _said(match: m.Match, name: str, lang: str) -> tuple[str, str | None]:
+    """The explanation in the reader's language. English keeps the stored (possibly AI-worded) text;
+    any other language is built from fixed templates, so it translates exactly."""
+    if lang == "en":
+        return match.explanation["rationale"], match.explanation.get("rationale_source")
+    facts = {
+        "fit_score": float(match.fit_score),
+        "readiness_score": float(match.readiness_score),
+        "gaps": match.explanation["gaps"],
+        "risk": match.risk_flags,
+    }
+    return say_in(name, facts, lang), "template"
 
 
 def warm_rationales(org_id: uuid.UUID) -> None:
@@ -166,6 +181,7 @@ def detail(
         match.explanation = {**match.explanation, "rationale": text, "rationale_source": source}
         flag_modified(match, "explanation")
         db.commit()
+    said = _said(match, org.name, user.language)
     return {
         "match_id": match.id,
         "opportunity": {
@@ -183,8 +199,8 @@ def detail(
         "components": match.explanation["components"],
         "gaps": match.explanation["gaps"],
         "risk_flags": match.risk_flags,
-        "rationale": match.explanation["rationale"],
-        "rationale_source": match.explanation.get("rationale_source"),
+        "rationale": said[0],
+        "rationale_source": said[1],
         "status": match.status,
         "model_version": match.model_version,
     }

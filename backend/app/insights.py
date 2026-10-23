@@ -19,6 +19,7 @@ from . import models as m
 from .engine.taxonomy import CAPABILITIES, COMPLIANCE_CATALOGUE
 from .llm import client, prompts
 from .config import settings
+from .i18n import LANGUAGES, REVIEWED
 from .llm import embed as emb
 
 CRITERIA = {
@@ -377,6 +378,7 @@ def ecosystem(db: Session) -> dict:
             "reviews": len(live),
             "criteria": [{"key": k, "label": CRITERIA[k], "average": crit[k]} for k in CRITERIA],
         },
+        "inclusion": _inclusion(db),
         "employment": {
             "jobs_potential": round(awarded_value / 1_000_000 * JOBS_PER_R1M),
             "assumption": f"{JOBS_PER_R1M:g} jobs per R1m awarded. This is a placeholder, not a "
@@ -509,4 +511,53 @@ def search_smes(db: Session, query: str) -> dict:
             }
             for p, org in ranked
         ],
+    }
+
+
+def _inclusion(db: Session) -> dict:
+    """How many businesses work in their own language, and whether that costs them anything."""
+    users = list(
+        db.scalars(select(m.User).where(m.User.role == "sme", m.User.deleted_at.is_(None)))
+    )
+    lang_of = {u.organisation_id: (u.language or "en") for u in users}
+    has_profile = {p.organisation_id for p in db.scalars(select(m.SmeProfile))}
+    applied: Counter = Counter()
+    awarded: Counter = Counter()
+    for a in db.scalars(select(m.Application)):
+        mt = db.get(m.Match, a.match_id)
+        lang = lang_of.get(mt.sme_id) if mt else None
+        if lang:
+            applied[lang] += 1
+            awarded[lang] += a.awarded_at is not None
+    voiced = {
+        a.user_id for a in db.scalars(select(m.AuditLog).where(m.AuditLog.action == "voice_used"))
+    }
+    rows = []
+    for code, label in LANGUAGES.items():
+        mine = [u for u in users if (u.language or "en") == code]
+        rows.append(
+            {
+                "language": code,
+                "label": label,
+                "reviewed": REVIEWED[code],
+                "businesses": len(mine),
+                "profile_complete_pct": round(
+                    100 * sum(u.organisation_id in has_profile for u in mine) / len(mine)
+                )
+                if mine
+                else None,
+                "applied": applied[code],
+                "awarded": awarded[code],
+            }
+        )
+    total = len(users)
+    home = sum(1 for u in users if (u.language or "en") != "en")
+    return {
+        "languages": rows,
+        "home_language_pct": round(100 * home / total) if total else 0,
+        "voice_users": sum(1 for u in users if u.id in voiced),
+        "assisted": sum(1 for u in users if u.assisted_by),
+        "businesses": total,
+        "note": "Language never enters a score. These figures show whether working in your own "
+        "language costs you anything at the point of application or award.",
     }

@@ -11,7 +11,7 @@ and behaves consistently. It does not prove real-world accuracy; that needs YES-
 import hashlib
 import json
 import random
-from dataclasses import replace
+from dataclasses import fields, replace
 from functools import lru_cache
 from math import log2
 
@@ -336,6 +336,13 @@ def evaluate() -> dict:
             "items": [{"name": n, "ok": ok} for n, ok in scenarios],
         },
         "benchmark": _benchmark(smes, opps, results),
+        "inputs": {
+            "business": [f.name for f in fields(SME) if f.name not in ("id", "name")],
+            "opportunity": [
+                f.name for f in fields(Opportunity) if f.name not in ("id", "title", "status")
+            ],
+            "free_text": False,
+        },
         "determinism": _determinism(smes, opps),
         "robustness": _robustness(smes, opps),
         "fairness": _fairness(smes, opps),

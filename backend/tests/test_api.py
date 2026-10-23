@@ -296,7 +296,7 @@ def test_providers_only_see_their_own_opportunities():
     funder = client.get("/opportunities", headers=login("funder@kopano.demo")).json()
     corp = client.get("/opportunities", headers=login("corporate@kopano.demo")).json()
     assert {o["kind"] for o in corp} == {"procurement"}
-    assert {o["kind"] for o in funder} >= {"grant", "investor"}
+    assert {o["kind"] for o in funder} >= {"grant"}
     assert all(o["provider"] == "Growth Catalyst Fund" for o in funder)
 
 

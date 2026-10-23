@@ -73,6 +73,12 @@ export default function ResponsibleAI() {
             </div>
             <p className="hint">{e.fairness.note}</p>
 
+            <h2>What the engine reads</h2>
+            <p>The scores use only these structured inputs. There is no free text and no language, so how a business writes or speaks cannot change its score.</p>
+            <div className="rai-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              <div className="rai-card"><b>From the business</b><p>{e.inputs.business.map((x) => x.replace(/_/g, ' ')).join(', ')}</p></div>
+              <div className="rai-card"><b>From the opportunity</b><p>{e.inputs.opportunity.map((x) => x.replace(/_/g, ' ')).join(', ')}</p></div>
+            </div>
             <h2>Human oversight</h2>
             <ul>{e.human_oversight.map((x) => <li key={x}>{x}</li>)}</ul>
 

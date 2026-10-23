@@ -116,7 +116,7 @@ class RequirementIn(Strict):
 
 
 class OpportunityIn(Strict):
-    kind: Literal["procurement", "grant", "funding", "investor", "support"] = "procurement"
+    kind: Literal["procurement", "grant", "funding", "training", "support"] = "procurement"
     title: str = Field(min_length=3, max_length=200)
     description: str | None = Field(default=None, max_length=4000)
     deadline: date | None = None

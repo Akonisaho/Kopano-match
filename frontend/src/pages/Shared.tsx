@@ -1,4 +1,5 @@
 import { MeaningCheck, TrackRecord } from '../components/AiPanels'
+import { useT } from '../i18n'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, dateFmt, isProvider, pretty, QUADRANT_COLOR, zar } from '../api'
@@ -15,6 +16,7 @@ export function MatchDetail() {
   const { id = '' } = useParams()
   const { me } = useAuth()
   const toast = useToast()
+  const t = useT()
   const nav = useNavigate()
   const m = useLoad(() => api.match(id), [id])
   const apps = useLoad(() => (me?.role === 'sme' ? api.applications() : Promise.resolve([])), [me?.role])
@@ -45,29 +47,29 @@ export function MatchDetail() {
           <p>
             <QuadrantBadge q={d.quadrant} />{' '}
             {mandatory.length > 0
-              ? <>{days} days and {zar(cost)} stand between {own ? 'you' : 'this business'} and an award.</>
-              : <>All mandatory requirements are met.</>}
+              ? <>{t('{d} days and {c} stand between {who} and an award.', { d: days, c: zar(cost), who: own ? t('you') : t('this business') })}</>
+              : <>{t('All mandatory requirements are met.')}</>}
           </p>
           <div className="table-actions" style={{ flexWrap: 'wrap' }}>
-            {own && !applied && d.status !== 'rejected' && <button className="btn btn-light" onClick={() => act('apply')}>Apply</button>}
-            {own && applied && <Badge tone="blue">Applied</Badge>}
+            {own && !applied && d.status !== 'rejected' && <button className="btn btn-light" onClick={() => act('apply')}>{t('Apply')}</button>}
+            {own && applied && <Badge tone="blue">{t('Applied')}</Badge>}
             {isProvider(me.role) && d.status === 'matched' && <>
-              <button className="btn btn-light" onClick={() => act('shortlist')}>Shortlist</button>
-              <button className="btn btn-ghost" style={{ color: '#fff' }} onClick={() => act('reject')}>Reject</button></>}
+              <button className="btn btn-light" onClick={() => act('shortlist')}>{t('Shortlist')}</button>
+              <button className="btn btn-ghost" style={{ color: '#fff' }} onClick={() => act('reject')}>{t('Reject')}</button></>}
             {d.status !== 'matched' && <Badge tone={d.status === 'shortlisted' || d.status === 'awarded' ? 'green' : 'gray'}>{pretty(d.status)}</Badge>}
-            <button className="btn btn-ghost" style={{ color: '#fff' }} onClick={() => nav(`/app/matches/${d.match_id}/dossier`)}>Decision dossier</button>
-            <button className="btn btn-ghost" style={{ color: '#fff' }} onClick={() => nav(-1)}>Back</button>
+            <button className="btn btn-ghost" style={{ color: '#fff' }} onClick={() => nav(`/app/matches/${d.match_id}/dossier`)}>{t('Decision dossier')}</button>
+            <button className="btn btn-ghost" style={{ color: '#fff' }} onClick={() => nav(-1)}>{t('Back')}</button>
           </div>
         </div>
-        <div className="unlock-side"><ScoreRing value={d.fit} label="Fit" /><ScoreRing value={d.readiness} label="Ready" color={QUADRANT_COLOR.coachable} /></div>
+        <div className="unlock-side"><ScoreRing value={d.fit} label={t('Fit')} /><ScoreRing value={d.readiness} label={t('Ready')} color={QUADRANT_COLOR.coachable} /></div>
       </section>
 
       {d.gaps.length > 0 && (
-        <Panel title="What stands in the way">
+        <Panel title={t('What stands in the way')}>
           <div className="grid-gaps">{d.gaps.map((g) => <GapCard key={g.credential} g={g} />)}</div>
         </Panel>)}
 
-      <Panel title="In plain words" right={<Badge tone="gray">{d.rationale_source === 'llm' ? 'AI-written from the figures' : 'From the score breakdown'}</Badge>}>
+      <Panel title={t('In plain words')} right={<Badge tone="gray">{d.rationale_source === 'llm' ? t('AI-written from the figures') : t('From the score breakdown')}</Badge>}>
         <p style={{ margin: 0, fontSize: 15, lineHeight: 1.7 }}>{d.rationale}</p>
       </Panel>
 
@@ -77,14 +79,14 @@ export function MatchDetail() {
       </div>
 
       <details className="bulk-tools more-detail">
-        <summary>How this was scored</summary>
+        <summary>{t('How this was scored')}</summary>
         <Explainer open />
         <div className="grid-2" style={{ marginTop: 14 }}>
-          <Panel title="How fit was calculated"><ScoreBreakdown components={d.components} /></Panel>
+          <Panel title={t('How fit was calculated')}><ScoreBreakdown components={d.components} /></Panel>
           <div>
             {procurement ? <RiskPanel r={d.risk_flags} contractValue={d.opportunity.contract_value} />
               : <Panel title="Capacity risk"><p className="hint" style={{ margin: 0 }}>Capacity flags apply to procurement contracts only.</p></Panel>}
-            <Panel title="Verification">{d.verifications.length ? d.verifications.map((v) => <VerificationRow key={v.id} v={v} />) : <p className="hint">No checks on record.</p>}</Panel>
+            <Panel title={t('Verification')}>{d.verifications.length ? d.verifications.map((v) => <VerificationRow key={v.id} v={v} />) : <p className="hint">{t('No checks on record.')}</p>}</Panel>
           </div>
         </div>
       </details>

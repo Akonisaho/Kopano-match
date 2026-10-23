@@ -47,6 +47,21 @@ export function Ecosystem() {
           <p className="hint" style={{ marginBottom: 0 }}>This is where a targeted programme (for example, a tax-clearance clinic) frees the most contract value. The Unlock Map prices it.</p>
         </Panel>
       </div>
+      <Panel title="Inclusion" sub="Language never enters a score. These figures show whether working in your own language costs a business anything."
+        right={<Badge tone="purple">{e.inclusion.home_language_pct}% work in a home language</Badge>}>
+        <div className="metric-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <Metric label="Home-language businesses" value={`${e.inclusion.home_language_pct}%`} note={`of ${e.inclusion.businesses} on the platform`} />
+          <Metric label="Used voice" value={e.inclusion.voice_users} note="read aloud or spoken search" />
+          <Metric label="Signed up with help" value={e.inclusion.assisted} note="by a support programme" />
+        </div>
+        <div className="table-wrap"><table>
+          <thead><tr><th>Language</th><th>Businesses</th><th>Profile complete</th><th>Applied</th><th>Awarded</th></tr></thead>
+          <tbody>{e.inclusion.languages.map((l) => (
+            <tr key={l.language}><td><b>{l.label}</b>{!l.reviewed && <> <Badge tone="amber">Beta</Badge></>}</td><td>{l.businesses}</td>
+              <td>{l.profile_complete_pct === null ? '–' : `${l.profile_complete_pct}%`}</td><td>{l.applied}</td><td>{l.awarded}</td></tr>))}</tbody>
+        </table></div>
+        <p className="hint" style={{ marginBottom: 0 }}>{e.inclusion.note} Figures come from this demo database.</p>
+      </Panel>
       <Panel title="Sector demand against supply" sub="Pressure is open opportunities per business. A high number means buyers want more than the platform can supply.">
         <div className="table-wrap"><table>
           <thead><tr><th>Sector</th><th>Businesses</th><th>Opportunities</th><th>Open value</th><th style={{ minWidth: 160 }}>Pressure</th></tr></thead>

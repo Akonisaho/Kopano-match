@@ -61,6 +61,10 @@ class User(Base):
     recovery_hashes: Mapped[list[str]] = mapped_column(
         ARRAY(Text), default=list, server_default=text("'{}'")
     )
+    # A preference, never an input to a score
+    language: Mapped[str] = mapped_column(String(5), default="en", server_default="en")
+    # The support programme that helped this business sign up, if one did
+    assisted_by: Mapped[uuid.UUID | None] = mapped_column(fk("core.organisations.id"))
 
 
 class Organisation(Base):

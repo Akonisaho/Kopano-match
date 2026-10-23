@@ -159,6 +159,9 @@ export const api = {
   publicOpportunities: () => request<PublicCard[]>('/public/opportunities'),
   publicOpportunity: (id: string) => request<PublicDetail>(`/public/opportunities/${id}`),
   publicPreview: (id: string, body: PreviewBody) => request<PublicPreview>(`/public/opportunities/${id}/preview`, json('POST', body)),
+  setLanguage: (language: string) => request<{ language: string }>('/me/language', json('PUT', { language })),
+  voiceUsed: async (feature: 'search' | 'describe' | 'read_aloud') => { await raw('/me/voice', json('POST', { feature })) },
+  assistBusiness: (b: AssistBody) => request<AssistResult>('/assist/businesses', json('POST', b)),
   importTemplate: async () => (await raw('/opportunities/import/template')).blob(),
 
   queue: () => request<Queue>('/admin/queue'),
@@ -178,10 +181,10 @@ export interface NotificationBox {
 }
 export type Role = 'sme' | 'corporate' | 'funder' | 'support' | 'admin'
 export type Quadrant = 'award_now' | 'coachable' | 'ready_weak_fit' | 'develop'
-export type Kind = 'procurement' | 'grant' | 'funding' | 'investor' | 'support'
+export type Kind = 'procurement' | 'grant' | 'funding' | 'training' | 'support'
 
 export interface Me {
-  id: string; email: string; full_name: string; role: Role; mfa_enabled: boolean
+  id: string; email: string; full_name: string; role: Role; mfa_enabled: boolean; language?: string
   organisation: { id: string; name: string; verification_status: string } | null
 }
 export interface Taxonomy {
@@ -352,7 +355,7 @@ export const daysUntil = (s: string | null) =>
   s ? Math.ceil((new Date(s).getTime() - Date.now()) / 86400000) : null
 
 export const KIND_LABEL: Record<Kind, string> = {
-  procurement: 'Procurement', grant: 'Grant', funding: 'Funding', investor: 'Investment', support: 'Business support',
+  procurement: 'Procurement', grant: 'Grant', funding: 'Funding', training: 'Training', support: 'Business support',
 }
 export const QUADRANT_LABEL: Record<Quadrant, string> = {
   award_now: 'Award ready', coachable: 'Coachable', ready_weak_fit: 'Ready, weak fit', develop: 'Develop',
@@ -401,6 +404,10 @@ export interface Ecosystem {
   quadrants: Record<string, number>
   quality: { reviews: number; criteria: { key: string; label: string; average: number | null }[] }
   employment: { jobs_potential: number; assumption: string }
+  inclusion: {
+    languages: { language: string; label: string; reviewed: boolean; businesses: number; profile_complete_pct: number | null; applied: number; awarded: number }[]
+    home_language_pct: number; voice_users: number; assisted: number; businesses: number; note: string
+  }
 }
 export interface Evaluation {
   model_version: string
@@ -412,6 +419,7 @@ export interface Evaluation {
     relevant_pairs: number; relevant_excluded_by_gates: number
   }
   determinism: { identical: boolean; fingerprint: string; runs: number }
+  inputs: { business: string[]; opportunity: string[]; free_text: boolean }
   robustness: { perturbation: string; trials: number; top3_overlap: number; quadrant_stable: number }
   fairness: {
     counterfactual_pairs: number; scores_changed_by_ownership: number; disclosed_max_fit_effect: number
@@ -449,15 +457,21 @@ export interface PublicCard {
 export interface PublicDetail extends PublicCard {
   description: string | null; duration_months: number; payment_terms_days: number
   scope: { label: string; value: number }[]
-  requirements: { text: string; mandatory: boolean; kind: string; days?: number; cost_zar?: number }[]
+  requirements: { text: string; mandatory: boolean; kind: string; value: Record<string, unknown>; days?: number; cost_zar?: number }[]
   preference: string[]
 }
 export interface PreviewBody {
   sector: string; province: string; years_trading: number; annual_turnover: number
-  capability_codes: string[]; documents: string[]
+  capability_codes: string[]; documents: string[]; language?: string
 }
 export interface PublicPreview {
   gate: 'pass' | 'remediable' | 'fail'; quadrant: Quadrant; fit: number; readiness: number
   components: Record<string, number>; gaps: Gap[]; risk: RiskFlags; fail_reasons: string[]; summary: string
   unlock: { days: number; cost_zar: number; documents: number }; stored: false
 }
+
+export interface AssistBody {
+  full_name: string; email: string; organisation_name: string; registration_number: string | null
+  language: string; consent: boolean
+}
+export interface AssistResult { organisation_id: string; email: string; language: string; emailed: boolean; setup_link?: string }

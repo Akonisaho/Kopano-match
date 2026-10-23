@@ -175,3 +175,11 @@ stored, and the page says what is compared.
 |---|---|---|
 | The passport is off until the business turns it on, shows no turnover, ownership or contact details, labels mock checks, and a rotated or disabled link stops working at once | `routers/passport.py` | `test_readiness_passport_is_shared_by_choice_and_exposes_only_safe_facts` |
 
+| Control | Where | Proven by |
+|---|---|---|
+| Language is a preference and never an input to a score; the engine reads no free text | `engine/types.py`, `evaluation.py` | `test_language_is_a_preference_that_never_changes_a_score`, `test_the_engine_reads_no_free_text_and_says_which_inputs_it_does_read` |
+| Assisted sign-up needs the support role, the business's attested consent, and the business sets its own password; the officer never holds it | `routers/inclusion.py` | `test_a_support_programme_can_sign_a_business_up_and_the_business_sets_its_own_password` |
+| Voice use records only that it happened, never audio or words | `routers/inclusion.py` | `test_voice_use_is_counted_without_keeping_anything_said` |
+
+Honest limit: in Chrome, voice search sends audio to Google to be turned into text. The page says so before it is used.
+

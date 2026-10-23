@@ -834,3 +834,25 @@ textarea:focus { border-color: var(--purple2); box-shadow: 0 0 0 3px rgba(124, 5
 .lx-clear { background: none !important; border: 0 !important; color: #ffd166 !important; text-decoration: underline; text-underline-offset: 3px; }
 .lx-count-line { color: #aab2de; font-size: 13px; margin: 0 0 14px; }
 
+/* ===== Language, voice and read-aloud ===== */
+.lang-select { border: 1px solid #d7deea; background: #fff; color: #344054; border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; outline: none; }
+.lang-select.dark { background: rgba(255, 255, 255, 0.08); color: #fff; border-color: rgba(255, 255, 255, 0.25); }
+.lang-select.dark option { color: #12213b; }
+.voice-btn { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%; display: inline-grid; place-items: center; border: 1px solid #d7deea; background: #fff; color: #4c1d95; cursor: pointer; transition: all 0.2s; }
+.voice-btn:hover { background: #f3ecff; }
+.voice-btn.on { background: #dc2626; color: #fff; border-color: #dc2626; animation: lx-pulse 1s ease-in-out infinite; }
+@keyframes lx-pulse { 50% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0.2); } }
+.read-aloud { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(124, 58, 237, 0.3); background: #faf5ff; color: #4c1d95; border-radius: 999px; padding: 8px 16px; font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+.read-aloud:hover:not(:disabled) { background: #f0e6ff; }
+.read-aloud:disabled { opacity: 0.5; cursor: not-allowed; }
+.read-aloud.on { background: #4c1d95; color: #fff; }
+.unlock-hero .read-aloud, .celebrate .read-aloud { background: rgba(255, 255, 255, 0.12); color: #fff; border-color: rgba(255, 255, 255, 0.3); }
+.lx-search { flex: 1 1 280px; min-width: 0; position: relative; display: flex; }
+.lx-search input { flex: 1; padding-right: 54px; }
+.lx-search .voice-btn { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; background: rgba(255, 255, 255, 0.1); color: #ffd166; border-color: rgba(255, 255, 255, 0.2); }
+.lx-cards.three { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 980px) { .lx-cards.three { grid-template-columns: 1fr; } }
+.lx-actions .lang-select { padding: 9px 12px; }
+.header-actions .lang-select { padding: 7px 12px; }
+.score-ring b small, .score-ring small { font-size: 8px; letter-spacing: 0.02em; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; margin-inline: auto; }
+

@@ -147,3 +147,19 @@ Honest limits: the impact report states ownership in aggregate, which is further
 personal information beyond matching, so the privacy notice says so. A buyer enters the award value
 itself; it is not reconciled against a signed contract. Consortium formation records the businesses'
 agreement to bid together, not a legal agreement between them.
+
+## Feedback, AI reading and ecosystem reporting
+
+| Control | Where | Proven by |
+|---|---|---|
+| Feedback needs an awarded application owned by the buyer, one per award, and comments exclude personal details | `routers/feedback.py`, `schemas.py` | `test_feedback_lifecycle_response_dispute_and_review` |
+| Only the business can respond or dispute; a reviewer decides; removed feedback leaves every average | `routers/feedback.py`, `insights.performance` | the same test |
+| AI reads a document only on a click, the request is audited, and nothing is saved from it | `routers/documents.py` | `test_ai_reads_a_document_for_review_and_checks_it_against_the_account` |
+| The meaning check carries no name, ownership or size and never changes a score | `insights.semantic` | `test_semantic_relevance_is_advisory_cached_and_scoped` |
+| CSV import is all or nothing, size-limited and role-limited | `routers/opportunities.py` | `test_csv_import_is_all_or_nothing_and_alerts_fire_once_per_match` |
+| The ecosystem view is admin-only, aggregate-only and hides counts under three | `insights.ecosystem` | `test_ecosystem_view_is_for_the_programme_owner_and_names_no_one` |
+| Tests cannot reach a real AI or email provider | `tests/conftest.py` | the whole suite |
+
+Honest limits: sending a document to Gemini shares it with a third party, so it is opt-in per document
+and the demo asks for sample files. Feedback is opinion, so it is disputable, never an automatic bar.
+

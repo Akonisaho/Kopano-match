@@ -15,6 +15,8 @@ export default function Privacy() {
           <li><b>Compliance documents</b>: to check readiness. Only your organisation and platform reviewers can open them. We keep a fingerprint (hash) to detect the same document reused by another business.</li>
           <li><b>Service emails</b>: a welcome, a shortlisting notice and an application notice go to the people the event concerns, through an email provider that acts as our operator. They carry no scores or documents.</li>
           <li><b>Impact reports and consortium proposals</b>: a buyer that awards work sees aggregate figures about who it reached (including ownership), with no business named. If a buyer proposes you for a consortium, the other members' names are shared with you only once everyone has accepted.</li>
+          <li><b>AI document reading</b>: only when you press &quot;Read with AI&quot; on a document. The file is sent to Google's Gemini service to read the text, the request is written to your audit log, and nothing is saved from it until you confirm. Use sample documents in this demo.</li>
+          <li><b>Feedback</b>: a buyer that awarded you work can rate it. You see every review, can respond, and can dispute one for a reviewer to decide. Reviews are tied to a real award, and personal details are not allowed in comments.</li>
           <li><b>Verification outcomes</b>: a result, a confidence figure and its source. We do <b>not</b> keep selfies, identity images or full ID numbers. The identity check receives the image, returns an outcome, and the image is discarded. We do not store the ID number at all.</li>
         </ul>
         <h2 style={{ fontSize: 17, marginTop: 28 }}>How decisions are made</h2>

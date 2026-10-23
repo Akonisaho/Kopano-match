@@ -20,21 +20,37 @@ log = logging.getLogger("kopano.notifications")
 
 
 def page(heading: str, paragraphs: list[str], cta: str, link: str) -> str:
+    """The email shell. Tables and inline styles only, because mail clients ignore most CSS."""
     body = "".join(
-        f'<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#344054">{html.escape(p)}</p>'
+        f'<p style="margin:0 0 14px;font-size:15px;line-height:1.65;color:#344054">{html.escape(p)}</p>'
         for p in paragraphs
     )
     href = html.escape(link if link.startswith("http") else settings.app_url.rstrip("/") + link)
+    font = "font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif"
     return (
-        '<div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">'
-        '<div style="font-weight:800;font-size:18px;color:#1d1060;margin-bottom:18px">Kopano Match</div>'
-        f'<h1 style="font-size:20px;color:#12213b;margin:0 0 14px">{html.escape(heading)}</h1>{body}'
-        f'<a href="{href}" style="display:inline-block;background:#7c3aed;color:#fff;'
-        "text-decoration:none;padding:11px 18px;border-radius:10px;font-weight:700;font-size:14px"
-        f'">{html.escape(cta)}</a>'
-        '<p style="margin-top:28px;font-size:12px;color:#8590a3">You are receiving this service '
-        "message because of activity on your Kopano Match account. This is a pilot; verification "
-        "sources shown in the app are labelled where they are simulated.</p></div>"
+        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#f3f1fb" '
+        f'style="background:#f3f1fb;padding:28px 12px;{font}"><tr><td align="center">'
+        '<table role="presentation" width="580" cellpadding="0" cellspacing="0" '
+        'style="width:100%;max-width:580px;background:#ffffff;border-radius:16px;overflow:hidden;'
+        'border:1px solid #e6e2f5">'
+        # header band, the same gradient as the app's welcome banner
+        '<tr><td bgcolor="#1d1060" style="background:#1d1060;'
+        'background-image:linear-gradient(135deg,#0f1b4d 0%,#3b1b8f 60%,#7c3aed 100%);padding:26px 32px">'
+        '<div style="font-size:11px;font-weight:700;letter-spacing:2px;color:#c4b5fd">DIGI DIVA</div>'
+        '<div style="font-size:22px;font-weight:800;color:#ffffff;margin-top:4px">Kopano Match</div>'
+        "</td></tr>"
+        f'<tr><td style="padding:32px 32px 8px"><h1 style="font-size:22px;line-height:1.3;'
+        f'color:#12213b;margin:0 0 16px">{html.escape(heading)}</h1>{body}</td></tr>'
+        '<tr><td style="padding:8px 32px 34px">'
+        f'<a href="{href}" style="display:inline-block;background:#7c3aed;'
+        "background-image:linear-gradient(90deg,#7c3aed,#c026d3);color:#ffffff;text-decoration:none;"
+        f'padding:13px 24px;border-radius:10px;font-weight:700;font-size:15px">{html.escape(cta)}</a>'
+        "</td></tr>"
+        '<tr><td bgcolor="#faf9fe" style="background:#faf9fe;border-top:1px solid #eeeaf8;padding:18px 32px">'
+        '<p style="margin:0;font-size:12px;line-height:1.6;color:#8590a3">You are receiving this '
+        "service message because of activity on your Kopano Match account. This is a pilot; "
+        "verification sources shown in the app are labelled where they are simulated.</p>"
+        "</td></tr></table></td></tr></table>"
     )
 
 
@@ -222,5 +238,57 @@ def consortium_response(db: Session, cons: m.Consortium, member: m.ConsortiumMem
                 [f"{sme.name} accepted ({done} of {len(members)})."],
                 "Open the opportunity",
                 path,
+            )
+    db.commit()
+
+
+def feedback_received(db: Session, fb: m.Feedback) -> None:
+    provider = db.get(m.Organisation, fb.provider_org_id)
+    for u in users_of(db, fb.sme_id):
+        notify(
+            db,
+            u,
+            "New feedback on your work",
+            [
+                f"{provider.name} left feedback on a recent award.",
+                "You can respond to it, or dispute it if you think it is unfair.",
+            ],
+            "Read the feedback",
+            "/app/feedback",
+        )
+    db.commit()
+
+
+def feedback_answered(db: Session, fb: m.Feedback, disputed: bool) -> None:
+    sme = db.get(m.Organisation, fb.sme_id)
+    if disputed:
+        subject = f"Feedback disputed: {sme.name}"
+        lines = [f"{sme.name} disputed your feedback. A reviewer will look at it and decide."]
+        targets = users_of(db, fb.provider_org_id) + list(
+            db.scalars(select(m.User).where(m.User.role == "admin", m.User.deleted_at.is_(None)))
+        )
+    else:
+        subject = f"{sme.name} responded to your feedback"
+        lines = ["The business added a response to your feedback."]
+        targets = users_of(db, fb.provider_org_id)
+    for u in targets:
+        notify(db, u, subject, lines, "Open feedback", "/app/feedback")
+    db.commit()
+
+
+def feedback_resolved(db: Session, fb: m.Feedback) -> None:
+    outcome = "removed" if fb.status == "removed" else "kept"
+    for org_id in (fb.sme_id, fb.provider_org_id):
+        for u in users_of(db, org_id):
+            notify(
+                db,
+                u,
+                "Feedback dispute decided",
+                [
+                    f"A reviewer looked at the dispute and the feedback was {outcome}.",
+                    fb.resolution_note or "",
+                ],
+                "Open feedback",
+                "/app/feedback",
             )
     db.commit()

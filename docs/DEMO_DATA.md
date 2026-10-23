@@ -98,7 +98,7 @@ Both are optional. Without them the app uses built-in fallbacks and never breaks
 **AI match summaries (Gemini).** Create a key in Google AI Studio and put it in `backend/.env`:
 ```
 GEMINI_API_KEY=<your key>
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-3.1-flash-lite
 ```
 Change `GEMINI_MODEL` if Google retires that name. With a key, the summary on each match reads
 "AI-written from the figures". The prompt carries figures only: no names or identifiers. Scores

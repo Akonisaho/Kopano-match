@@ -9,12 +9,14 @@ file is git-ignored. Never paste a key into chat, a ticket or a commit.
 ## Gemini (AI summaries and drafting)
 
 1. Open **Google AI Studio**: https://aistudio.google.com/apikey and sign in with a Google account.
-2. Choose **Create API key**. If it asks for a Google Cloud project, pick the default one or create one.
+2. Choose **Create API key**. If it asks for a Google Cloud project, pick the default one or create one;
+   Google creates a project and key automatically if you have none. Keep the key private and, in Google
+   Cloud, restrict it to the Gemini API (Generative Language API) if you plan to keep it.
 3. Copy the key (it starts with `AIza`).
 4. In `backend/.env` add, with no quotes or spaces:
    ```
    GEMINI_API_KEY=AIza...your key...
-   GEMINI_MODEL=gemini-2.0-flash
+   GEMINI_MODEL=gemini-3.1-flash-lite
    ```
    If the check below says the model was not found, replace `GEMINI_MODEL` with a current model name from AI Studio.
 5. Check it: `cd backend` then `python scripts/check_keys.py`.
@@ -30,7 +32,7 @@ app silently falls back to its template summary.
 2. **Add a sender.** Open **Senders, Domains and Dedicated IPs**, then **Senders**, then **Add a sender**.
    Use an address you can open. Brevo emails you a verification link: click it.
 3. **Create an API key.** Open your account menu (top right), then **SMTP and API**, then the
-   **API Keys** tab, then **Generate a new API key**. Copy it once; it is not shown again.
+   **API Keys** tab (it may be labelled "API keys & MCP"), then **Generate a new API key**. Copy it once; it is not shown again.
 4. In `backend/.env` add:
    ```
    EMAIL_PROVIDER=brevo
@@ -48,8 +50,9 @@ app silently falls back to its template summary.
 6. Restart the API so it reads the new values.
 
 Notes:
-- A Gmail or Outlook address works as a sender for a demo, but mail from it often lands in spam.
-  A sender on your own authenticated domain (SPF and DKIM set up in Brevo) is far better.
+- Brevo cannot authenticate gmail.com or outlook.com senders, so mail from them often lands in spam.
+  A sender on a domain you control (SPF and DKIM set up in Brevo) is far better. For the demo, check
+  the spam folder first.
 - Check Brevo's current free-plan daily limit before a live demo.
 - Brevo acts as an operator of personal information. Sign an operator agreement before any real use.
 - Register demo accounts with inboxes you own, for example `you+sme1@gmail.com`. Do not use other people's addresses.

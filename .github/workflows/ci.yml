@@ -35,6 +35,7 @@ jobs:
       - run: ruff check . && ruff format --check .
       - run: python seed.py
       - run: python scripts/check_engine.py --assert
+      - run: python scripts/evaluate_engine.py --assert
       - run: pytest -q
   frontend:
     runs-on: ubuntu-latest

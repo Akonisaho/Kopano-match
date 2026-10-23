@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, zar, type Role, type Showcase } from '../api'
 import { homeFor, useAuth } from '../auth'
 import QuadrantChart from '../components/QuadrantChart'
+import { Icon } from '../components/Icon'
 import { TRUST } from '../trust'
 import AuthModal from '../components/AuthModal'
 import { Badge, Logo } from '../ui'
@@ -18,6 +19,11 @@ const ROLES: { key: Exclude<Role, 'admin'>; label: string; desc: string; points:
     points: ['Match on readiness, not just size', 'See common bottlenecks', 'Track who applied and why'] },
 ]
 
+
+const ICON_FOR: Record<string, string> = {
+  '2': 'layers', R: 'wallet', '!': 'alert', '+': 'users', ID: 'id', ORG: 'building', DOC: 'file',
+  LOG: 'database', ACC: 'lock', POPIA: 'shield', MFA: 'lock', AV: 'shield-alert',
+}
 
 export default function Landing({ initialAuth }: { initialAuth?: 'login' | 'signup' }) {
   const [auth, setAuth] = useState<'login' | 'signup' | null>(initialAuth ?? null)
@@ -101,6 +107,10 @@ export default function Landing({ initialAuth }: { initialAuth?: 'login' | 'sign
                   <div className="callout blue">A greedy set-cover over the scope items bundles up to three SMEs and nominates the most ready as lead. No other SME fit this scope alone.</div></> : <p className="empty">Loading live data…</p>}
               </div>
             </div>
+            <div className="float-chip chip-a"><Icon name="unlock" size={18} />
+              <div><b>{show?.example ? `${show.example.days} days, ${zar(show.example.cost_zar)}` : 'Costed plans'}</b><small>stands between an SME and an award</small></div></div>
+            <div className="float-chip chip-b"><Icon name="shield" size={18} />
+              <div><b>Append-only audit log</b><small>decisions cannot be rewritten</small></div></div>
             <div className="hero-controls">{[0, 1, 2].map((i) => (
               <button key={i} className={`hero-dot ${slide === i ? 'active' : ''}`} onClick={() => setSlide(i)} aria-label={`Show slide ${i + 1}`} />))}</div>
           </div>
@@ -135,7 +145,7 @@ export default function Landing({ initialAuth }: { initialAuth?: 'login' | 'sign
               ['R', 'Costed readiness plans', 'Each gap names the issuer, turnaround in days, cost in rand, and how many other open opportunities the same document unlocks.'],
               ['!', 'Capacity-risk flags', 'Overtrading, concentration and working-capital needs are flagged so a contract that could sink a small business is not celebrated as a win.'],
               ['+', 'Consortium assembly', 'When no single SME covers the scope, the platform bundles up to three SMEs over the line items and proposes a lead.']].map(([i, t, d]) => (
-              <div className="value-card" key={t}><div className="icon">{i}</div><h3>{t}</h3><p>{d}</p></div>))}
+              <div className="value-card" key={t}><div className="icon"><Icon name={ICON_FOR[i] ?? 'sparkles'} size={22} /></div><h3>{t}</h3><p>{d}</p></div>))}
           </div>
           <div style={{ maxWidth: 980, margin: '34px auto 0' }}>
             <div className="compare"><div className="table-wrap"><table>
@@ -155,7 +165,7 @@ export default function Landing({ initialAuth }: { initialAuth?: 'login' | 'sign
           <div className="section-head"><span>TRUST &amp; SECURITY</span><h2>Honest about what is built and what is not</h2><p>Each control is marked as in place or on the roadmap. Nothing here is claimed that the code does not do.</p></div>
           <div className="cards-4">
             {TRUST.map((c) => (
-              <div className="value-card" key={c.t}><div className="icon">{c.i}</div><h3>{c.t}</h3><p>{c.d}</p>
+              <div className="value-card" key={c.t}><div className="icon"><Icon name={ICON_FOR[c.i] ?? 'sparkles'} size={22} /></div><h3>{c.t}</h3><p>{c.d}</p>
                 <div className="status"><Badge tone={c.ok ? 'green' : 'amber'}>{c.ok ? 'In place' : 'Roadmap'}</Badge></div></div>))}
           </div>
         </section>
@@ -172,6 +182,14 @@ export default function Landing({ initialAuth }: { initialAuth?: 'login' | 'sign
           </div>
         </section>
 
+        <section className="cta-band">
+          <h2>See what stands between your SMEs and an award.</h2>
+          <p>Create a profile or publish an opportunity in minutes. Every match shows fit, readiness, the days and rand to close each gap, and the risk, in plain language.</p>
+          <div className="hero-actions" style={{ justifyContent: 'center' }}>
+            <button className="btn btn-primary" onClick={() => open('signup')}>Create an account <Icon name="arrow" size={16} /></button>
+            <a className="btn btn-outline" href="#different">How it is different</a>
+          </div>
+        </section>
         <section className="section navy" id="about">
           <div className="section-head"><span style={{ color: '#c5b7ff' }}>BUILT BY DIGI DIVA</span><h2>Practical digital infrastructure for SME growth</h2>
             <p>Kopano Match is developed by Digi Diva, combining product delivery, automation, data, security and SME-focused solution design. It is a working pilot: the specific list of what separates it from an enterprise deployment is published in the repository.</p></div>
@@ -181,6 +199,7 @@ export default function Landing({ initialAuth }: { initialAuth?: 'login' | 'sign
       <footer className="site-footer">
         <span>© Digi Diva · Kopano Match pilot. Built against POPIA's conditions; not a claim of compliance.</span>
         <span><a href="/privacy">Privacy notice</a></span>
+        <span><a href="/responsible-ai">Responsible AI</a></span>
       </footer>
 
       {auth && <AuthModal mode={auth} role={role} roles={ROLES} setMode={setAuth} setRole={setRole} onClose={() => { setAuth(null); if (window.location.pathname !== '/') nav('/') }} />}

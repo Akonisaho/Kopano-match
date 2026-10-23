@@ -20,7 +20,9 @@ from ..audit import write_audit
 from ..auth import current_user, own_org_or_404, require_role
 from ..config import settings
 from ..db import get_db
-from ..engine.taxonomy import COMPLIANCE_CATALOGUE
+from ..engine.taxonomy import CAPABILITIES, COMPLIANCE_CATALOGUE, PROVINCES, SECTORS
+from ..llm import client, prompts
+from ..schemas import Strict
 from ..services import doc_status
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -33,6 +35,10 @@ ALLOWED = {
     ".jpeg": ({"image/jpeg"}, (b"\xff\xd8\xff",)),
 }
 RETENTION_YEARS = 5
+
+
+class ExpiryIn(Strict):
+    expiry_date: date
 
 
 def _view(d: m.Document) -> dict:
@@ -180,3 +186,120 @@ def download(
     return FileResponse(
         path, media_type=doc.mime_type, headers={"Content-Disposition": "attachment"}
     )
+
+
+def _own_document(db: Session, user: m.User, doc_id: uuid.UUID) -> m.Document:
+    doc = db.get(m.Document, doc_id)
+    if doc is None or doc.organisation_id != user.organisation_id:
+        raise HTTPException(404, "Not found")
+    return doc
+
+
+def _same_number(a: str | None, b: str | None) -> bool:
+    digits = lambda x: "".join(ch for ch in (x or "") if ch.isdigit())  # noqa: E731
+    return bool(digits(a)) and digits(a) == digits(b)
+
+
+def extraction_checks(db: Session, doc: m.Document, got: prompts.DocumentExtraction) -> list[dict]:
+    """Plain checks of what the AI read against what is already on file. A person decides."""
+    org = db.get(m.Organisation, doc.organisation_id)
+    out: list[dict] = []
+    if got.document_type and got.document_type != doc.document_type:
+        read = COMPLIANCE_CATALOGUE[got.document_type].label
+        filed = COMPLIANCE_CATALOGUE[doc.document_type].label
+        out.append(
+            {"level": "warn", "text": f"This reads like a {read}, but it is filed as a {filed}."}
+        )
+    if got.expiry_date:
+        if got.expiry_date < date.today():
+            out.append(
+                {
+                    "level": "warn",
+                    "text": f"The document says it expired on {got.expiry_date:%d %b %Y}.",
+                }
+            )
+        if doc.expiry_date and doc.expiry_date != got.expiry_date:
+            out.append(
+                {
+                    "level": "warn",
+                    "text": f"The document shows {got.expiry_date:%d %b %Y} but you entered {doc.expiry_date:%d %b %Y}.",
+                }
+            )
+    if got.registration_number and org.registration_number:
+        if not _same_number(got.registration_number, org.registration_number):
+            out.append(
+                {
+                    "level": "warn",
+                    "text": "The registration number on the document does not match your account.",
+                }
+            )
+    if (
+        got.company_name
+        and org.name.lower() not in got.company_name.lower()
+        and got.company_name.lower() not in org.name.lower()
+    ):
+        out.append(
+            {"level": "warn", "text": f'The document names "{got.company_name}", not "{org.name}".'}
+        )
+    if not out:
+        out.append({"level": "ok", "text": "Nothing on the document contradicts what is on file."})
+    return out
+
+
+@router.post("/{doc_id}/extract")
+def read_with_ai(
+    doc_id: uuid.UUID, user: m.User = Depends(require_role("sme")), db: Session = Depends(get_db)
+):
+    """AI reads one uploaded document and drafts what it says. Sends the file to the AI provider,
+    so it only runs when the business asks, and the request is audited. Nothing is saved from it."""
+    doc = _own_document(db, user, doc_id)
+    path = Path(doc.file_url)
+    if not path.is_file() or settings.upload_dir.resolve() not in path.resolve().parents:
+        raise HTTPException(404, "Not found")
+    prompt = prompts.EXTRACT_DOCUMENT.format(
+        docs=sorted(COMPLIANCE_CATALOGUE),
+        sectors=SECTORS,
+        provinces=PROVINCES,
+        codes=sorted(CAPABILITIES),
+    )
+    got = client.call(prompt, prompts.DocumentExtraction, file=(path.read_bytes(), doc.mime_type))
+    write_audit(
+        db,
+        user.id,
+        "document_ai_read",
+        "document",
+        doc.id,
+        new={"provider": settings.llm_provider, "read": got is not None},
+    )
+    db.commit()
+    if got is None:
+        return {"source": "unavailable", "draft": None, "checks": []}
+    return {
+        "source": "ai",
+        "provider": settings.llm_provider,
+        "draft": got.model_dump(mode="json"),
+        "checks": extraction_checks(db, doc, got),
+    }
+
+
+@router.put("/{doc_id}/expiry")
+def set_expiry(
+    doc_id: uuid.UUID,
+    body: ExpiryIn,
+    user: m.User = Depends(require_role("sme")),
+    db: Session = Depends(get_db),
+):
+    doc = _own_document(db, user, doc_id)
+    old = doc.expiry_date
+    doc.expiry_date = body.expiry_date
+    write_audit(
+        db,
+        user.id,
+        "document_expiry_set",
+        "document",
+        doc.id,
+        old={"expiry": str(old)},
+        new={"expiry": str(body.expiry_date)},
+    )
+    db.commit()
+    return _view(doc)

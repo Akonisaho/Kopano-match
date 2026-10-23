@@ -1,7 +1,9 @@
+import csv
+import io
 import uuid
 from collections import Counter
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -41,12 +43,7 @@ def owned_opportunity(db: Session, user: m.User, opp_id: uuid.UUID) -> m.Opportu
     return o
 
 
-@router.post("", status_code=201)
-def create(
-    body: OpportunityIn,
-    user: m.User = Depends(require_role(*PROVIDER_ROLES)),
-    db: Session = Depends(get_db),
-):
+def _persist(db: Session, user: m.User, body: OpportunityIn) -> m.Opportunity:
     if body.kind not in KINDS_BY_ROLE[user.role]:
         raise HTTPException(
             422, f"A {user.role} account can post: {', '.join(KINDS_BY_ROLE[user.role])}"
@@ -85,8 +82,134 @@ def create(
         o.id,
         new={"title": o.title, "requirements": len(body.requirements)},
     )
+    return o
+
+
+@router.post("", status_code=201)
+def create(
+    body: OpportunityIn,
+    user: m.User = Depends(require_role(*PROVIDER_ROLES)),
+    db: Session = Depends(get_db),
+):
+    o = _persist(db, user, body)
     db.commit()
     return _summary(o)
+
+
+IMPORT_COLUMNS = [
+    "title", "kind", "sector", "province", "contract_value", "duration_months",
+    "payment_terms_days", "deadline", "description", "capabilities", "documents", "min_years",
+]  # fmt: skip
+IMPORT_TEMPLATE = (
+    ",".join(IMPORT_COLUMNS)
+    + "\nProvincial roads rehabilitation,procurement,construction,Gauteng,4200000,12,30,2026-12-01,"
+    '"Resurfacing and drainage on provincial roads",CON-ROADS:2500000;CON-CIVIL:1700000,TCS;BBBEE;CIDB,3\n'
+)
+MAX_IMPORT_ROWS = 200
+MAX_IMPORT_BYTES = 200_000
+
+
+def _row_to_opportunity(row: dict) -> OpportunityIn:
+    scope, requirements = [], []
+    for part in filter(None, (row.get("capabilities") or "").split(";")):
+        code, _, value = part.partition(":")
+        scope.append({"code": code.strip(), "value": float(value)})
+        requirements.append(
+            {
+                "requirement_type": "capability",
+                "requirement_value": {"code": code.strip()},
+                "weight": 10,
+            }
+        )
+    for code in filter(None, (row.get("documents") or "").replace(" ", "").split(";")):
+        kind = "certification" if code == "CIDB" else "compliance_doc"
+        requirements.append(
+            {"requirement_type": kind, "requirement_value": {"doc": code}, "weight": 10}
+        )
+    if (row.get("min_years") or "").strip():
+        requirements.append(
+            {
+                "requirement_type": "min_years",
+                "requirement_value": {"years": int(row["min_years"])},
+                "weight": 5,
+            }
+        )
+    return OpportunityIn.model_validate(
+        {
+            "kind": (row.get("kind") or "procurement").strip(),
+            "title": (row.get("title") or "").strip(),
+            "description": (row.get("description") or "").strip() or None,
+            "deadline": (row.get("deadline") or "").strip() or None,
+            "sector": (row.get("sector") or "").strip(),
+            "province": (row.get("province") or "").strip(),
+            "contract_value": float(row.get("contract_value") or 0),
+            "duration_months": int(row.get("duration_months") or 0),
+            "payment_terms_days": int(row.get("payment_terms_days") or 30),
+            "scope_items": scope,
+            "requirements": requirements,
+        }
+    )
+
+
+@router.get("/import/template")
+def import_template(user: m.User = Depends(require_role(*PROVIDER_ROLES))):
+    return Response(
+        IMPORT_TEMPLATE,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="opportunities-template.csv"'},
+    )
+
+
+@router.post("/import")
+async def import_opportunities(
+    dry_run: bool = False,
+    file: UploadFile = File(...),
+    user: m.User = Depends(require_role(*PROVIDER_ROLES)),
+    db: Session = Depends(get_db),
+):
+    """Bulk-load opportunities from a CSV, so a procurement system can export and upload.
+    All or nothing: one bad row stops the import and every problem is listed with its row."""
+    raw = await file.read(MAX_IMPORT_BYTES + 1)
+    if len(raw) > MAX_IMPORT_BYTES:
+        raise HTTPException(413, "The file is too large (200 KB limit)")
+    try:
+        reader = csv.DictReader(io.StringIO(raw.decode("utf-8-sig")))
+    except UnicodeDecodeError:
+        raise HTTPException(415, "Save the file as CSV (UTF-8)") from None
+    if not reader.fieldnames or "title" not in reader.fieldnames:
+        raise HTTPException(422, "The first row must be the column names. Download the template.")
+    parsed: list[OpportunityIn] = []
+    errors: list[dict] = []
+    for n, row in enumerate(reader, start=2):
+        if n - 1 > MAX_IMPORT_ROWS:
+            raise HTTPException(422, f"At most {MAX_IMPORT_ROWS} rows per import")
+        try:
+            parsed.append(_row_to_opportunity(row))
+        except Exception as e:  # noqa: BLE001 - any bad cell becomes a row-level message
+            detail = (
+                "; ".join(x["msg"].replace("Value error, ", "") for x in e.errors())
+                if hasattr(e, "errors")
+                else "check the numbers and codes in this row"
+            )
+            errors.append({"row": n, "error": detail})
+    if errors or dry_run:
+        if errors and not dry_run:
+            raise HTTPException(422, {"message": "Nothing was imported", "errors": errors})
+        return {
+            "rows": len(parsed),
+            "created": 0,
+            "errors": errors,
+            "titles": [p.title for p in parsed],
+        }
+    for body in parsed:
+        _persist(db, user, body)
+    db.commit()
+    return {
+        "rows": len(parsed),
+        "created": len(parsed),
+        "errors": [],
+        "titles": [p.title for p in parsed],
+    }
 
 
 @router.post("/extract")

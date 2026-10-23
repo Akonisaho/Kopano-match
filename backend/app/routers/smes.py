@@ -293,3 +293,11 @@ def unlock_plan(
     if result is None:
         raise HTTPException(404, "Complete your profile first")
     return result
+
+
+@router.get("/me/quality")
+def profile_quality(user: m.User = Depends(require_role("sme")), db: Session = Depends(get_db)):
+    """Incomplete or inconsistent details, found by plain rules. Nothing here is a verdict."""
+    from .. import insights
+
+    return {"flags": insights.profile_flags(db, user.organisation_id)}

@@ -1,3 +1,4 @@
+import { ImportPanel } from '../components/AiPanels'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
@@ -31,7 +32,7 @@ export function ProviderOverview() {
   const total = Object.values(o.by_quadrant).reduce((a, b) => a + (b ?? 0), 0)
   return (
     <>
-      <Welcome eyebrow={FOCUS[me.role]} title={`${me.organisation?.name ?? 'Your organisation'} workspace`}
+      <Welcome hero eyebrow={FOCUS[me.role]} title={`${me.organisation?.name ?? 'Your organisation'} workspace`}
         text="Publish opportunities as rules, then review ranked, explainable SME matches. The system ranks; you decide."
         action={<Link className="btn btn-primary" to="/app/post">+ Create opportunity</Link>} />
       <div className="metric-grid">
@@ -130,6 +131,7 @@ export function PostOpportunity() {
   return (
     <>
       <Welcome title="Create an opportunity" text="Requirements are rules, not prose. Each row is a gate (mandatory) or a weighted preference, and that is what makes every match explainable." />
+      <ImportPanel />
       <form onSubmit={submit}><Panel title="Opportunity details" right={<Badge tone="green">{FOCUS[role]}</Badge>}>
         <ErrorNote error={error} />
         <details style={{ marginBottom: 18 }}><summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Draft requirements from tender text (optional)</summary>

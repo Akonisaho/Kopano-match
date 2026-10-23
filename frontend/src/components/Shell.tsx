@@ -3,24 +3,31 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { isProvider, tokenSecondsLeft, type Role } from '../api'
 import { roleLabel, useAuth } from '../auth'
 import { Logo } from '../ui'
+import { Icon } from './Icon'
 import NotificationBell from './NotificationBell'
+
+const ICON: Record<string, string> = {
+  OV: 'home', PF: 'user', VR: 'shield', DC: 'file', OP: 'search', AP: 'send', CN: 'users', SC: 'lock',
+  PO: 'plus', SL: 'bookmark', SME: 'building', UM: 'unlock', IM: 'chart', RQ: 'inbox', FB: 'award', EC: 'trending',
+}
+const initialsOf = (name: string) => name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
 type NavItem = [path: string, label: string, icon: string]
 
 const NAV: Record<string, NavItem[]> = {
   sme: [['/app', 'Overview', 'OV'], ['/app/profile', 'Business profile', 'PF'], ['/app/verification', 'Verification', 'VR'],
     ['/app/documents', 'Documents', 'DC'], ['/app/opportunities', 'Opportunities', 'OP'], ['/app/applications', 'Applications', 'AP'], ['/app/consortia', 'Consortia', 'CN'],
-    ['/app/security', 'Trust & security', 'SC']],
+    ['/app/feedback', 'Feedback', 'FB'], ['/app/security', 'Trust & security', 'SC']],
   provider: [['/app', 'Overview', 'OV'], ['/app/post', 'Post opportunity', 'PO'], ['/app/shortlist', 'Shortlists', 'SL'],
-    ['/app/applications', 'Applications', 'AP'], ['/app/smes', 'Verified SMEs', 'SME'], ['/app/insights', 'Unlock Map', 'UM'], ['/app/impact', 'Impact', 'IM'], ['/app/security', 'Trust & security', 'SC']],
-  admin: [['/app/queue', 'Review queue', 'RQ'], ['/app/security', 'Trust & security', 'SC']],
+    ['/app/applications', 'Applications', 'AP'], ['/app/smes', 'Verified SMEs', 'SME'], ['/app/insights', 'Unlock Map', 'UM'], ['/app/impact', 'Impact', 'IM'], ['/app/feedback', 'Feedback', 'FB'], ['/app/security', 'Trust & security', 'SC']],
+  admin: [['/app/ecosystem', 'Ecosystem', 'EC'], ['/app/queue', 'Review queue', 'RQ'], ['/app/security', 'Trust & security', 'SC']],
 }
 
 const TITLES: [string, string][] = [
   ['/app/profile', 'Business profile'], ['/app/verification', 'Verification centre'], ['/app/documents', 'Documents'],
   ['/app/opportunities/', 'Opportunity'], ['/app/opportunities', 'Opportunities'], ['/app/applications', 'Applications'],
   ['/app/post', 'Create opportunity'], ['/app/shortlist', 'Shortlists'], ['/app/smes', 'Verified SMEs'], ['/app/insights', 'Unlock Map'], ['/app/impact', 'Impact report'], ['/app/consortia', 'Consortium invitations'],
-  ['/app/security', 'Trust & security'], ['/app/queue', 'Review queue'], ['/app/matches/', 'Match detail'], ['/app', 'Dashboard'],
+  ['/app/security', 'Trust & security'], ['/app/queue', 'Review queue'], ['/app/ecosystem', 'Ecosystem'], ['/app/feedback', 'Feedback'], ['/app/matches/', 'Match detail'], ['/app', 'Dashboard'],
 ]
 
 function useSessionLeft() {
@@ -55,7 +62,7 @@ export default function Shell() {
         <nav className="side-nav" aria-label="Main">
           {navFor(me.role).map(([to, label, icon]) => (
             <NavLink key={to} to={to} end={to === '/app'} className={({ isActive }) => (isActive ? 'active' : '')}>
-              <span className="nav-icon">{icon}</span><span>{label}</span>
+              <span className="nav-icon"><Icon name={ICON[icon] ?? 'sparkles'} size={18} /></span><span>{label}</span>
             </NavLink>))}
         </nav>
         <div className="side-spacer" />
@@ -70,6 +77,7 @@ export default function Shell() {
           <h2>{title}</h2>
           <div className="header-actions">
             <NotificationBell />
+            <span className="avatar" title={me.full_name}>{initialsOf(me.full_name)}</span>
             <span className={`security-chip ${mins !== null && mins <= 5 ? 'warn' : ''}`} title="Access tokens expire after 30 minutes">
               Secure session · {roleLabel(me.role)}{mins !== null ? ` · ${mins} min left` : ''}
             </span>

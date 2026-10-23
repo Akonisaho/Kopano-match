@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={{ me, loading, signIn, signOut, refresh, signedOut }}>{children}</Ctx.Provider>
 }
 
-export const homeFor = (role: Role) => (role === 'admin' ? '/app/queue' : '/app')
+export const homeFor = (role: Role) => (role === 'admin' ? '/app/ecosystem' : '/app')
 export const roleLabel = (r: Role) =>
   ({ sme: 'SME', corporate: 'Corporate buyer', funder: 'Funder / investor', support: 'Business support', admin: 'Platform reviewer' })[r]
 

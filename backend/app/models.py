@@ -291,3 +291,46 @@ class ConsortiumMember(Base):
         String(10), default="pending"
     )  # pending, accepted, declined
     responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Feedback(Base):
+    """A buyer's structured rating of an SME after an award. The SME can respond or dispute."""
+
+    __tablename__ = "feedback"
+    __table_args__ = (
+        UniqueConstraint("application_id", name="uq_feedback_application"),
+        Index("ix_feedback_sme", "sme_id"),
+        {"schema": "core"},
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), **PK)
+    application_id: Mapped[uuid.UUID] = mapped_column(fk("core.applications.id"))
+    sme_id: Mapped[uuid.UUID] = mapped_column(fk("core.organisations.id"))
+    provider_org_id: Mapped[uuid.UUID] = mapped_column(fk("core.organisations.id"))
+    author_id: Mapped[uuid.UUID] = mapped_column(fk("core.users.id"))
+    ratings: Mapped[dict] = mapped_column(JSONB)  # criterion -> 1..5
+    comment: Mapped[str | None] = mapped_column(Text)
+    # published, responded, disputed, upheld (dispute lost), removed (dispute won)
+    status: Mapped[str] = mapped_column(String(12), default="published")
+    sme_response: Mapped[str | None] = mapped_column(Text)
+    responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    dispute_reason: Mapped[str | None] = mapped_column(Text)
+    resolved_by: Mapped[uuid.UUID | None] = mapped_column(fk("core.users.id"))
+    resolution_note: Mapped[str | None] = mapped_column(Text)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
+
+
+class AiInsight(Base):
+    """A cached AI-written note (semantic relevance, feedback summary). Advisory only."""
+
+    __tablename__ = "ai_insights"
+    __table_args__ = (
+        UniqueConstraint("kind", "subject_id", name="uq_insight_subject"),
+        {"schema": "core"},
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), **PK)
+    kind: Mapped[str] = mapped_column(String(20))  # semantic, feedback_summary
+    subject_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    input_hash: Mapped[str] = mapped_column(String(64))
+    payload: Mapped[dict] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)

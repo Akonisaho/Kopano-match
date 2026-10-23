@@ -2,9 +2,10 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import {
   api, dateFmt, daysUntil, isProvider, KIND_LABEL, pretty, zar,
-  type Gap, type Kind, type Profile, type ProfileResponse, type Taxonomy, type UnlockResult, type Verification,
+  type Doc, type Gap, type Kind, type Profile, type ProfileResponse, type Taxonomy, type UnlockResult, type Verification,
 } from '../api'
 import { useAuth } from '../auth'
+import { ProfileHealth, ReadWithAi } from '../components/AiPanels'
 import { useLoad } from '../hooks'
 import {
   Badge, ErrorNote, GapCard, Logo, Metric, MiniBar, Panel, QuadrantBadge, ScoreRing, Spinner, VerificationRow, Welcome, useToast,
@@ -72,7 +73,7 @@ export function SmeOverview() {
   const step = nextStep(p, checks, dash.data?.open_gaps ?? [], best, apps.data?.length ?? 0)
   return (
     <>
-      <Welcome eyebrow="SME workspace" title={`Welcome, ${me?.full_name.split(' ')[0]}`}
+      <Welcome hero eyebrow="SME workspace" title={`Welcome, ${me?.full_name.split(' ')[0]}`}
         text={p.completion.percent >= 100 ? 'Your profile is complete. Keep documents current to stay award-ready.' : 'Complete the remaining steps to unlock more matches and shorten the time to award.'}
         action={p.completion.percent < 100 ? <Link className="btn btn-primary" to="/app/verification">Complete verification</Link> : undefined} />
       <div className="next-step">
@@ -254,6 +255,7 @@ export function SmeProfilePage() {
           <div className="progress"><i style={{ width: `${c.percent}%` }} /></div>
           {c.steps.map((s) => <div key={s.label} className="verify-row"><span className={`check-circle ${s.done ? '' : 'idle'}`}>{s.done ? '✓' : '·'}</span><div><b>{s.label}</b></div><span /></div>)}
         </Panel>
+        <ProfileHealth />
         <Panel title="Organisation"><p style={{ margin: 0, fontSize: 13 }}><b>{prof.data.organisation.name}</b><br /><span className="hint">Registration {prof.data.organisation.registration_number ?? 'not provided'}</span></p></Panel>
       </div>
     </div>
@@ -364,6 +366,7 @@ export function Documents() {
   const toast = useToast()
   const docs = useLoad(() => api.documents())
   const tax = useLoad(() => api.taxonomy())
+  const [reading, setReading] = useState<Doc | null>(null)
   async function view(id: string) {
     try { window.open(URL.createObjectURL(await api.downloadDocument(id)), '_blank', 'noopener') }
     catch (err) { toast((err as Error).message, 'error') }
@@ -380,9 +383,10 @@ export function Documents() {
             <tr key={d.id}><td><b>{d.document_type}</b></td><td>{d.issuer}</td>
               <td><Badge tone={d.status === 'valid' ? 'green' : 'amber'}>{pretty(d.status)}</Badge></td>
               <td>{dateFmt(d.expiry_date)}</td><td>{dateFmt(d.uploaded_at)}</td>
-              <td>{d.has_file ? <button className="btn btn-outline btn-small" onClick={() => view(d.id)}>View</button> : <span className="hint">Seeded record</span>}</td></tr>))}</tbody>
+              <td>{d.has_file ? <div className="table-actions"><button className="btn btn-outline btn-small" onClick={() => view(d.id)}>View</button><button className="btn btn-outline btn-small" onClick={() => setReading(d)}>Read with AI</button></div> : <span className="hint">Seeded record</span>}</td></tr>))}</tbody>
         </table></div> : <div className="empty"><strong>No documents yet</strong>Upload a tax compliance PIN or B-BBEE affidavit to improve your readiness.</div>}
       </Panel>
+      {reading && <ReadWithAi doc={reading} onClose={() => setReading(null)} onChanged={docs.reload} />}
     </>
   )
 }

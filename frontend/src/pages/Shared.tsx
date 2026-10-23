@@ -1,3 +1,4 @@
+import { MeaningCheck, TrackRecord } from '../components/AiPanels'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, dateFmt, isProvider, pretty, QUADRANT_COLOR, zar } from '../api'
@@ -67,6 +68,10 @@ export function MatchDetail() {
             : <Panel title="Capacity risk"><p className="hint" style={{ margin: 0 }}>Capacity flags apply to procurement contracts only, so none are shown for this opportunity type.</p></Panel>}
           <Panel title="Verification" sub="Each check shows its source.">{d.verifications.length ? d.verifications.map((v) => <VerificationRow key={v.id} v={v} />) : <p className="hint">No checks on record.</p>}</Panel>
         </div>
+      </div>
+      <div className="grid-2">
+        <MeaningCheck matchId={d.match_id} />
+        {!own && <TrackRecord smeId={d.sme.id} />}
       </div>
       <Panel title="Readiness gaps" sub="Each one is dated and costed, with how many other opportunities the same credential unlocks.">
         {d.gaps.length ? <div className="grid-gaps">{d.gaps.map((g) => <GapCard key={g.credential} g={g} />)}</div> : <p className="hint" style={{ margin: 0 }}>No open gaps.</p>}

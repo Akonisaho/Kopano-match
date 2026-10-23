@@ -12,12 +12,21 @@ import { AdminQueue } from './pages/Admin'
 import { Dossier } from './pages/Dossier'
 import { ImpactPage } from './pages/Impact'
 import { UnlockMap } from './pages/Insights'
+import { Ecosystem } from './pages/Ecosystem'
+import { ProviderFeedback, SmeFeedback } from './pages/Feedback'
+import ResponsibleAI from './pages/ResponsibleAI'
 
 function Index() {
   const { me } = useAuth()
   if (!me) return null
-  if (me.role === 'admin') return <Navigate to="/app/queue" replace />
+  if (me.role === 'admin') return <Navigate to="/app/ecosystem" replace />
   return isProvider(me.role) ? <ProviderOverview /> : <SmeOverview />
+}
+
+function FeedbackRoute() {
+  const { me } = useAuth()
+  if (!me) return null
+  return isProvider(me.role) ? <ProviderFeedback /> : <SmeFeedback />
 }
 
 export default function App() {
@@ -27,6 +36,7 @@ export default function App() {
       <Route path="/login" element={<Landing initialAuth="login" />} />
       <Route path="/register" element={<Landing initialAuth="signup" />} />
       <Route path="/privacy" element={<Privacy />} />
+      <Route path="/responsible-ai" element={<ResponsibleAI />} />
       <Route path="/reset" element={<ResetPassword />} />
       <Route path="/onboarding" element={<RequireRole roles={['sme']}><Onboarding /></RequireRole>} />
       <Route path="/app" element={<RequireRole roles={['sme', 'corporate', 'funder', 'support', 'admin']}><Shell /></RequireRole>}>
@@ -45,6 +55,8 @@ export default function App() {
         <Route path="impact" element={<RequireRole roles="provider"><ImpactPage /></RequireRole>} />
         <Route path="consortia" element={<RequireRole roles={['sme']}><Consortia /></RequireRole>} />
         <Route path="queue" element={<RequireRole roles={['admin']}><AdminQueue /></RequireRole>} />
+        <Route path="ecosystem" element={<RequireRole roles={['admin']}><Ecosystem /></RequireRole>} />
+        <Route path="feedback" element={<RequireRole roles={['sme', 'corporate', 'funder', 'support']}><FeedbackRoute /></RequireRole>} />
         <Route path="matches/:id" element={<MatchDetail />} />
         <Route path="security" element={<SecurityCentre />} />
       </Route>

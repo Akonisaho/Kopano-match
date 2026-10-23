@@ -580,7 +580,7 @@ def test_expiry_reminders_go_out_once_and_only_once():
     first = client.post("/admin/reminders/run", headers=admin)
     assert first.status_code == 200
     second = client.post("/admin/reminders/run", headers=admin).json()
-    assert second == {"notices_sent": 0, "documents": 0}
+    assert second["notices_sent"] == 0 and second["documents"] == 0
     assert client.post("/admin/reminders/run", headers=login("sme-001@sme.demo")).status_code == 403
 
 

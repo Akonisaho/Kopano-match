@@ -112,3 +112,11 @@ def showcase(db: Session = Depends(get_db)):
         "example": example,
         "consortium": group,
     }
+
+
+@router.get("/evaluation")
+def evaluation_report():
+    """The engine's measured behaviour on synthetic data, with its limits. Public by design."""
+    from ..evaluation import evaluate
+
+    return evaluate()

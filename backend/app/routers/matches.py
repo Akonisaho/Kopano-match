@@ -211,3 +211,13 @@ def reject(
     db: Session = Depends(get_db),
 ):
     return _decide(match_id, "rejected", user, db)
+
+
+@router.get("/{match_id}/semantic")
+def semantic_relevance(
+    match_id: uuid.UUID, user: m.User = Depends(current_user), db: Session = Depends(get_db)
+):
+    """Advisory, meaning-based reading of how the opportunity text fits the business."""
+    from .. import insights
+
+    return insights.semantic(db, readable_match(db, user, match_id))

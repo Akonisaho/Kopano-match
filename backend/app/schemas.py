@@ -1,5 +1,6 @@
 """Request bodies. Every route takes one of these, so nothing unvalidated reaches the database."""
 
+import re
 from datetime import date
 from typing import Literal
 
@@ -185,3 +186,49 @@ class AwardIn(Strict):
 
 class RespondIn(Strict):
     accept: bool
+
+
+_PERSONAL = re.compile(
+    r"[\w.+-]+@[\w-]+\.[\w.]+|\b\d{13}\b|(?:\+?27|0)[\s-]?\d{2}[\s-]?\d{3}[\s-]?\d{4}"
+)
+
+
+def _no_personal_details(v: str | None) -> str | None:
+    """Feedback is about the work. Keep emails, phone numbers and ID numbers out of it (POPIA)."""
+    if v and _PERSONAL.search(v):
+        raise ValueError("Leave out email addresses, phone numbers and ID numbers")
+    return v
+
+
+class FeedbackIn(Strict):
+    ratings: dict[str, int]
+    comment: str | None = Field(default=None, max_length=1000)
+
+    _clean = field_validator("comment")(_no_personal_details)
+
+    @field_validator("ratings")
+    @classmethod
+    def complete(cls, v: dict[str, int]) -> dict[str, int]:
+        keys = {
+            "quality",
+            "delivery",
+            "responsiveness",
+            "compliance",
+            "innovation",
+            "value_for_money",
+        }
+        if set(v) != keys:
+            raise ValueError("Rate all six criteria")
+        if any(not 1 <= x <= 5 for x in v.values()):
+            raise ValueError("Each rating is from 1 to 5")
+        return v
+
+
+class FeedbackResponseIn(Strict):
+    text: str = Field(min_length=3, max_length=1000)
+    _clean = field_validator("text")(_no_personal_details)
+
+
+class FeedbackResolveIn(Strict):
+    decision: Literal["uphold", "remove"]
+    note: str = Field(min_length=3, max_length=500)

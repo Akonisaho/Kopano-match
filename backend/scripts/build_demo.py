@@ -253,7 +253,7 @@ OPPORTUNITIES = [
             sector="services",
             province="Gauteng",
             description="Grants of up to R250k for youth-owned businesses. Applicants must be tax compliant.",
-            deadline=str(TODAY + timedelta(days=18)),
+            deadline=str(TODAY + timedelta(days=6)),
             contract_value=250_000,
             duration_months=12,
             payment_terms_days=30,
@@ -470,6 +470,38 @@ def main():
         )
         if status != 200:
             fail(f"award for {name}: {status} {body.get('detail')}")
+    print("Leaving buyer feedback on the awards ...")
+    keys = ("quality", "delivery", "responsiveness", "compliance", "innovation", "value_for_money")
+    reviews = {
+        "Masego Infrastructure": (
+            [5, 5, 4, 5, 4, 5],
+            "Delivered the first phase ahead of schedule and the paperwork was complete.",
+        ),
+        "Thabo Civils": (
+            [4, 3, 4, 4, 3, 4],
+            "Good quality work, but two milestones slipped by about a week.",
+        ),
+    }
+    _, owed = api.call("GET", "/feedback/awaiting", ptoken[by])
+    for item in owed:
+        if item["sme"] in reviews:
+            scores, comment = reviews[item["sme"]]
+            status, body = api.call(
+                "POST",
+                f"/feedback/{item['application_id']}",
+                ptoken[by],
+                body={"ratings": dict(zip(keys, scores)), "comment": comment},
+            )
+            if status != 201:
+                fail(f"feedback for {item['sme']}: {status} {body.get('detail')}")
+    _, got = api.call("GET", "/feedback/mine", stokens["Masego Infrastructure"])
+    api.call(
+        "POST",
+        f"/feedback/{got['items'][0]['id']}/respond",
+        stokens["Masego Infrastructure"],
+        body={"text": "Thank you. The second phase is already scheduled with the same crew."},
+    )
+    print("  Thabo Civils has not answered its review yet: respond or dispute it live.")
     by2, agri = opp_ids["Integrated agri-hub build"]
     status, inv = api.call("POST", f"/opportunities/{agri}/consortium/invite", ptoken[by2])
     if status != 201:

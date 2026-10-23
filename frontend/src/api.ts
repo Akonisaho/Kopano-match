@@ -126,6 +126,29 @@ export const api = {
     request<{ status: string; my_response: string }>(`/consortia/${id}/respond`, json('POST', { accept })),
   dossier: (id: string) => request<DossierData>(`/matches/${id}/dossier`),
 
+  feedbackAwaiting: () => request<AwaitingReview[]>('/feedback/awaiting'),
+  feedbackGiven: () => request<FeedbackItem[]>('/feedback/given'),
+  leaveFeedback: (applicationId: string, ratings: Record<string, number>, comment: string) =>
+    request<{ id: string }>(`/feedback/${applicationId}`, json('POST', { ratings, comment: comment || null })),
+  feedbackMine: () => request<{ items: FeedbackItem[]; performance: Performance }>('/feedback/mine'),
+  respondFeedback: (id: string, text: string) => request<unknown>(`/feedback/${id}/respond`, json('POST', { text })),
+  disputeFeedback: (id: string, text: string) => request<unknown>(`/feedback/${id}/dispute`, json('POST', { text })),
+  feedbackDisputes: () => request<FeedbackItem[]>('/feedback/disputes'),
+  resolveFeedback: (id: string, decision: 'uphold' | 'remove', note: string) =>
+    request<unknown>(`/feedback/${id}/resolve`, json('POST', { decision, note })),
+  trackRecord: (smeId: string) => request<Performance>(`/feedback/performance/${smeId}`),
+  readDocument: (id: string) => request<DocReading>(`/documents/${id}/extract`, json('POST')),
+  setExpiry: (id: string, expiry_date: string) => request<Doc>(`/documents/${id}/expiry`, json('PUT', { expiry_date })),
+  semantic: (matchId: string) => request<Semantic>(`/matches/${matchId}/semantic`),
+  profileQuality: () => request<{ flags: { level: string; text: string }[] }>('/smes/me/quality'),
+  ecosystem: () => request<Ecosystem>('/admin/ecosystem'),
+  evaluation: () => request<Evaluation>('/meta/evaluation'),
+  importOpportunities: (file: File, dryRun: boolean) => {
+    const form = new FormData(); form.append('file', file)
+    return request<ImportResult>(`/opportunities/import?dry_run=${dryRun}`, { method: 'POST', body: form })
+  },
+  importTemplate: async () => (await raw('/opportunities/import/template')).blob(),
+
   queue: () => request<Queue>('/admin/queue'),
   reviewVerification: (id: string, decision: string) =>
     request<unknown>(`/admin/verifications/${id}/review`, json('POST', { decision })),
@@ -326,4 +349,61 @@ export const QUADRANT_COLOR: Record<Quadrant, string> = {
 }
 export const QUADRANT_BADGE: Record<Quadrant, string> = {
   award_now: 'purple', coachable: 'amber', ready_weak_fit: 'blue', develop: 'gray',
+}
+
+export interface AwaitingReview { application_id: string; sme: string; opportunity: string; awarded_value: number; awarded_at: string }
+export interface FeedbackItem {
+  id: string; sme: string; provider: string; ratings: Record<string, number>; comment: string | null
+  status: 'published' | 'responded' | 'disputed' | 'upheld' | 'removed'
+  response: string | null; dispute_reason: string | null; resolution_note: string | null; created_at: string
+}
+export interface Performance {
+  reviews: number; reliable: boolean; overall: number | null
+  criteria: { key: string; label: string; average: number | null }[]
+  disputed_open: number; responded: number
+  summary: null | { source: 'ai' | 'figures'; summary: string; strengths: string[]; development_areas: string[] }
+}
+export interface DocReading {
+  source: 'ai' | 'unavailable'; provider?: string
+  draft: null | {
+    document_type: string | null; company_name: string | null; registration_number: string | null
+    issuer: string | null; expiry_date: string | null; sector: string | null; province: string | null
+    annual_turnover: number | null; years_trading: number | null; capability_codes: string[]
+  }
+  checks: { level: 'ok' | 'warn' | 'info'; text: string }[]
+}
+export interface Semantic {
+  source: 'ai' | 'keywords'; score: number; matched_themes: string[]; concerns: string[]
+  rationale: string; advisory: string
+}
+export interface ImportResult { rows: number; created: number; errors: { row: number; error: string }[]; titles: string[] }
+export interface Ecosystem {
+  totals: { businesses: number; youth_owned: number; opportunities: number; open_value: number; matches: number; applications: number; awards: number; awarded_value: number }
+  funnel: { stage: string; count: number }[]
+  sectors: { sector: string; businesses: number | string; opportunities: number | string; value: number; pressure: number }[]
+  provinces: { province: string; businesses: number | string; opportunities: number | string }[]
+  skills: { code: string; label: string; requested: number; businesses: number; shortfall: boolean }[]
+  underserved: { label: string; requested: number; businesses: number }[]
+  credential_gaps: { label: string; matches_blocked: number }[]
+  quadrants: Record<string, number>
+  quality: { reviews: number; criteria: { key: string; label: string; average: number | null }[] }
+  employment: { jobs_potential: number; assumption: string }
+}
+export interface Evaluation {
+  model_version: string
+  data: { source: string; businesses: number; opportunities: number; personal_data: boolean }
+  scenarios: { passed: number; total: number; items: { name: string; ok: boolean }[] }
+  benchmark: {
+    opportunities: number; businesses: number; rubric: string
+    methods: { method: string; ndcg_at_5: number; precision_at_3: number }[]
+    relevant_pairs: number; relevant_excluded_by_gates: number
+  }
+  determinism: { identical: boolean; fingerprint: string; runs: number }
+  fairness: {
+    counterfactual_pairs: number; scores_changed_by_ownership: number; disclosed_max_fit_effect: number
+    groups: { group: string; businesses: number; kept_rate: number; award_ready_rate: number }[]
+    disparate_impact: { attribute: string; ratio: number; within_four_fifths: boolean }[]
+    note: string
+  }
+  limitations: string[]; human_oversight: string[]
 }

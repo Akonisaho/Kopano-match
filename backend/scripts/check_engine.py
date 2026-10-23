@@ -9,9 +9,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.engine.runner import consortium_for, match_all  # noqa: E402
-from app.engine.scoring import THRESHOLD, covered_codes  # noqa: E402
-from app.engine.types import Gate  # noqa: E402
-from app.seed_data import PLANTED, build_seed  # noqa: E402
+from app.evaluation import scenario_checks  # noqa: E402
+from app.seed_data import build_seed  # noqa: E402
 
 
 def main(check: bool) -> int:
@@ -52,47 +51,9 @@ def main(check: bool) -> int:
     if not check:
         return 0
 
-    def get(opp_id: str, sme_id: str):
-        return next((r for r in results[opp_id] if r.sme_id == sme_id), None)
-
-    def expect(cond: bool, msg: str) -> None:
-        if not cond:
+    for msg, ok in scenario_checks(smes, opps, results):
+        if not ok:
             failures.append(msg)
-
-    r = get("opp-1", PLANTED["coachable"])
-    expect(r and r.fit > THRESHOLD and r.readiness < THRESHOLD, "coachable: fit>60, readiness<60")
-    expect(
-        r and len(r.gaps) == 2 and all(g.days and g.issuer for g in r.gaps),
-        "coachable: two dated gaps with issuer",
-    )
-    expect(r and any(g.also_unlocks > 0 for g in r.gaps), "coachable: a gap has also_unlocks>0")
-
-    r = get("opp-1", PLANTED["expired_only"])
-    expect(
-        r and r.gate == Gate.REMEDIABLE and len(r.gaps) == 1 and r.gaps[0].credential == "BBBEE",
-        "expired_only: one remediable BBBEE gap",
-    )
-
-    r = get("opp-1", PLANTED["overtrading"])
-    expect(r and r.risk.overtrading and r.fit > THRESHOLD, "overtrading flag on a high-fit match")
-
-    for sid in PLANTED["ready"]:
-        r = get("opp-1", sid)
-        expect(r and r.quadrant == "award_now" and r.gate == Gate.PASS, f"{sid}: award_now")
-
-    quads = {r.quadrant for r in results["opp-1"]}
-    expect(len(quads) >= 3, f"opp-1 chart spans >=3 quadrants (got {sorted(quads)})")
-
-    opp4 = next(o for o in opps if o.id == "opp-4")
-    expect(
-        all(covered_codes(opp4, s) != {i.code for i in opp4.scope_items} for s in smes),
-        "opp-4: no single SME covers the scope",
-    )
-    c = consortium_for(opp4, smes, results["opp-4"])
-    expect(
-        c is not None and c.coverage_pct == 100.0 and c.lead_sme_id in c.member_sme_ids,
-        "opp-4: consortium covers 100% and names a lead",
-    )
 
     print()
     if failures:

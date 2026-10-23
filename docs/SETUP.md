@@ -158,3 +158,42 @@ with two of three accepted. Sign in as `you+buildright@...` and press Accept to 
 
 **Unlock Plan, best first move.** Tick the documents you plan to get and the plan ranks them by contract
 value opened per day of waiting, for example "Best first move: Letter of good standing (COIDA)".
+
+## 12. Feedback, AI reading, ecosystem view and Responsible AI
+
+**Feedback.** After an award, the buyer opens *Feedback* and rates six criteria (quality, delivery,
+responsiveness, compliance, innovation, value for money) with an optional comment. Comments cannot hold
+emails, phone numbers or ID numbers. The business sees every review under *Feedback*, can respond once,
+and can dispute one. A reviewer decides disputes in the *Review queue*: keep it, or remove it (removed
+reviews drop out of every average). Buyers see a business's track record on the match page. Fewer than
+three reviews shows as an "early signal". `build_demo.py` leaves one answered review and one unanswered
+review (Thabo Civils) so you can respond or dispute live.
+
+**Read with AI.** *Documents*, then *Read with AI*. The file goes to Gemini only after the business
+presses the button, the request is audited, and the draft is checked against the account (document
+type, expiry, registration number, company name). Nothing is saved until the person chooses *Use expiry*
+or *Add to my profile*. Use sample documents in the demo.
+
+**Meaning check.** On a match, *Run the meaning check* compares the opportunity text and the
+capabilities by meaning. It is advisory and never changes a score.
+
+**CSV import.** *Post opportunity*, then *Import from your procurement system*. Download the template,
+fill it, press *Check file*, then *Import*. One bad row stops the whole import.
+
+**Closing-soon alerts.** `python scripts/send_reminders.py` (or the admin reminders button) also
+tells good-fit businesses that have not applied when an opportunity closes within 7 days. Each match is
+alerted once.
+
+**Ecosystem (admin).** Sign in as the admin. The landing page is the programme view for YES: funnel,
+sector demand against supply, skills shortfalls, underserved categories, credential gaps, delivery
+ratings. Aggregates only, and counts under three are hidden. The jobs figure uses a placeholder
+coefficient and says so.
+
+**Responsible AI.** `/responsible-ai` is public and computes live from `backend/app/evaluation.py`:
+scenario checks, ranking quality against baselines, determinism, a fairness audit and the limits.
+`docs/MODEL_CARD.md` is the written version.
+
+**Tests never call a real provider.** `backend/tests/conftest.py` forces log email and no AI, whatever
+keys are in `.env`. Run the API for browser testing with `EMAIL_PROVIDER=log` so demo accounts never
+email a real address.
+

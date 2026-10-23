@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { useNavigate } from 'react-router-dom'
 import type { Gap, Quadrant, RiskFlags, Verification } from './api'
 import { QUADRANT_BADGE, QUADRANT_LABEL, pretty, zar } from './api'
+import { Icon, iconFor } from './components/Icon'
 
 /* ---------- toasts ---------- */
 interface Toast { id: number; text: string; kind: 'success' | 'error' | 'info' }
@@ -13,7 +14,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const push = useCallback((text: string, kind: Toast['kind'] = 'success') => {
     const id = Date.now() + Math.random()
     setItems((x) => [...x, { id, text, kind }])
-    setTimeout(() => setItems((x) => x.filter((t) => t.id !== id)), 4200)
+    setTimeout(() => setItems((x) => x.filter((t) => t.id !== id)), 3200)
   }, [])
   return (
     <ToastCtx.Provider value={push}>
@@ -58,7 +59,13 @@ export function Badge({ tone, children }: { tone: string; children: ReactNode })
 export const QuadrantBadge = ({ q }: { q: Quadrant }) => <Badge tone={QUADRANT_BADGE[q]}>{QUADRANT_LABEL[q]}</Badge>
 
 export function Spinner({ label = 'Loading…' }: { label?: string }) {
-  return <p className="empty" role="status">{label}</p>
+  return (
+    <div className="skeleton-wrap" role="status" aria-label={label}>
+      <div className="skeleton sk-title" />
+      <div className="skeleton-grid"><div className="skeleton sk-card" /><div className="skeleton sk-card" /><div className="skeleton sk-card" /><div className="skeleton sk-card" /></div>
+      <div className="skeleton sk-panel" />
+    </div>
+  )
 }
 
 export function ErrorNote({ error }: { error: string | null }) {
@@ -66,7 +73,12 @@ export function ErrorNote({ error }: { error: string | null }) {
 }
 
 export function Metric({ label, value, note, tone }: { label: string; value: ReactNode; note?: string; tone?: string }) {
-  return <div className="metric"><span>{label}</span><b style={tone ? { color: tone } : undefined}>{value}</b>{note && <small>{note}</small>}</div>
+  return (
+    <div className="metric">
+      <div className="metric-top"><span>{label}</span><i className="metric-icon"><Icon name={iconFor(label)} size={16} /></i></div>
+      <b style={tone ? { color: tone } : undefined}>{value}</b>{note && <small>{note}</small>}
+    </div>
+  )
 }
 
 export function Panel({ title, sub, right, children }: { title?: ReactNode; sub?: string; right?: ReactNode; children: ReactNode }) {
@@ -78,9 +90,9 @@ export function Panel({ title, sub, right, children }: { title?: ReactNode; sub?
   )
 }
 
-export function Welcome({ eyebrow, title, text, action }: { eyebrow?: string; title: string; text?: string; action?: ReactNode }) {
+export function Welcome({ eyebrow, title, text, action, hero }: { eyebrow?: string; title: string; text?: string; action?: ReactNode; hero?: boolean }) {
   return (
-    <div className="welcome">
+    <div className={`welcome${hero ? ' welcome-hero' : ''}`}>
       <div>{eyebrow && <span className="eyebrow dark">{eyebrow}</span>}<h1>{title}</h1>{text && <p>{text}</p>}</div>
       {action}
     </div>

@@ -15,6 +15,7 @@ import { UnlockMap } from './pages/Insights'
 import { Ecosystem } from './pages/Ecosystem'
 import { ProviderFeedback, SmeFeedback } from './pages/Feedback'
 import ResponsibleAI from './pages/ResponsibleAI'
+import PassportPage from './pages/PassportPage'
 
 function Index() {
   const { me } = useAuth()
@@ -37,6 +38,7 @@ export default function App() {
       <Route path="/register" element={<Landing initialAuth="signup" />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/responsible-ai" element={<ResponsibleAI />} />
+      <Route path="/passport/:token" element={<PassportPage />} />
       <Route path="/reset" element={<ResetPassword />} />
       <Route path="/onboarding" element={<RequireRole roles={['sme']}><Onboarding /></RequireRole>} />
       <Route path="/app" element={<RequireRole roles={['sme', 'corporate', 'funder', 'support', 'admin']}><Shell /></RequireRole>}>

@@ -214,3 +214,16 @@ one organisation, and *Revoke* stops the feed at once. Every call is audited.
 **Robustness.** The evaluation also nudges turnover and years trading and reports how stable the
 shortlist stays. CI fails it if the top three overlap drops under 80%.
 
+## 14. The simple home, the Readiness Passport and the two stories
+
+**Business home.** One number (the contract value waiting behind your open documents), one next step, a
+four-step journey, your passport and your best match. Everything else sits under *More* in the sidebar.
+
+**Readiness Passport.** *Home*, then *Create my passport*. It gives a link and a QR code that anyone can
+open without signing in. It shows verified checks with their source (mock sources say so), documents
+and expiry dates, capabilities and an aggregate rating. It never shows turnover, ownership or contact
+details. *New link* kills the old one at once, and *Turn off* hides it.
+
+**Two stories.** The landing page has an interactive pair of stories (a business and a buyer). The dot moves
+when the documents are uploaded. `docs/DEMO.md` is the 2:30 script and `docs/INVESTOR.md` is the investor view.
+

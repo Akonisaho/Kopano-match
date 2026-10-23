@@ -350,3 +350,19 @@ class ApiKey(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Passport(Base):
+    """A business's shareable Readiness Passport link. The business can rotate or switch it off."""
+
+    __tablename__ = "passports"
+    __table_args__ = (
+        UniqueConstraint("organisation_id", name="uq_passport_org"),
+        {"schema": "core"},
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), **PK)
+    organisation_id: Mapped[uuid.UUID] = mapped_column(fk("core.organisations.id"))
+    token: Mapped[str] = mapped_column(String(64), unique=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
+    rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

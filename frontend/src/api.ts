@@ -152,6 +152,9 @@ export const api = {
   ingestKeys: () => request<IngestKey[]>('/ingest/keys'),
   createIngestKey: (name: string) => request<IngestKey & { key: string }>('/ingest/keys', json('POST', { name })),
   revokeIngestKey: (id: string) => request<IngestKey>(`/ingest/keys/${id}/revoke`, json('POST')),
+  passport: () => request<PassportState>('/smes/me/passport'),
+  passportAction: (kind: 'enable' | 'rotate' | 'disable') => request<PassportState>(`/smes/me/passport/${kind}`, json('POST')),
+  publicPassport: (token: string) => request<PassportView>(`/passport/${encodeURIComponent(token)}`),
   importTemplate: async () => (await raw('/opportunities/import/template')).blob(),
 
   queue: () => request<Queue>('/admin/queue'),
@@ -424,3 +427,12 @@ export interface SmeHit {
   verification_status: string; similarity: number
 }
 export interface IngestKey { id: string; name: string; prefix: string; created_at: string; last_used_at: string | null; revoked: boolean }
+
+export interface PassportView {
+  name: string; sector: string | null; province: string | null; years_trading: number | null
+  capabilities: string[]; checks: { label: string; ok: boolean; source: string }[]
+  credentials: { label: string; status: string; expires: string | null }[]; credentials_valid: number
+  track_record: { reviews: number; overall: number | null; reliable: boolean }
+  as_of: string; notice: string
+}
+export interface PassportState { enabled: boolean; link: string | null; qr: string | null; preview: PassportView }

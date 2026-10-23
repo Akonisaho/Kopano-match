@@ -472,3 +472,47 @@ def test_procurement_system_feed_with_api_key():
 def test_published_evaluation_includes_robustness_to_small_input_changes():
     e = client.get("/meta/evaluation").json()
     assert e["robustness"]["top3_overlap"] >= 0.8 and e["robustness"]["quadrant_stable"] >= 0.8
+
+
+def test_readiness_passport_is_shared_by_choice_and_exposes_only_safe_facts():
+    sme = register("sme")
+    own = client.get("/smes/me/passport", headers=sme).json()
+    assert own["enabled"] is False and own["link"] is None  # off until the business turns it on
+
+    assert (
+        client.post("/smes/me/passport/enable", headers=login("corporate@kopano.demo")).status_code
+        == 403
+    )
+    on = client.post("/smes/me/passport/enable", headers=sme).json()
+    assert (
+        on["enabled"]
+        and on["link"].count("/passport/") == 1
+        and on["qr"].startswith("data:image/svg")
+    )
+    token = on["link"].rsplit("/", 1)[1]
+
+    # Anyone with the link can read it, with no sign-in
+    view = client.get(f"/passport/{token}")
+    assert view.status_code == 200
+    body = view.json()
+    for key in ("turnover", "annual_turnover", "ownership", "email", "phone"):
+        assert key not in str({k: v for k, v in body.items() if k != "notice"}).lower()
+    assert "notice" in body and body["track_record"]["reviews"] == 0
+
+    # A known business shows verified checks with their source, so a mock is labelled a mock
+    khaya = login(_email_of("Khaya Earthworks"))
+    k = client.post("/smes/me/passport/enable", headers=khaya).json()
+    kview = client.get(f"/passport/{k['link'].rsplit('/', 1)[1]}").json()
+    assert kview["checks"] and all("mock" in c["source"] for c in kview["checks"])
+    assert kview["credentials_valid"] >= 1
+
+    # Rotating kills the old link; switching off hides it
+    new = client.post("/smes/me/passport/rotate", headers=sme).json()
+    assert client.get(f"/passport/{token}").status_code == 404
+    new_token = new["link"].rsplit("/", 1)[1]
+    assert client.get(f"/passport/{new_token}").status_code == 200
+    off = client.post("/smes/me/passport/disable", headers=sme).json()
+    assert off["enabled"] is False and client.get(f"/passport/{new_token}").status_code == 404
+    assert client.get("/passport/not-a-real-token").status_code == 404
+    actions = [a["action"] for a in client.get("/me/audit", headers=sme).json()]
+    assert {"passport_enabled", "passport_rotated", "passport_disabled"} <= set(actions)

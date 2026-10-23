@@ -16,6 +16,7 @@ from .routers import (
     meta,
     notifications,
     opportunities,
+    passport,
     providers,
     smes,
 )
@@ -75,6 +76,7 @@ for r in (
     consortia,
     feedback,
     ingest,
+    passport,
 ):
     app.include_router(r.router)
 

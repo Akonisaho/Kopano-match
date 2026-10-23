@@ -12,15 +12,18 @@ const ICON: Record<string, string> = {
 }
 const initialsOf = (name: string) => name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
-type NavItem = [path: string, label: string, icon: string]
+type NavItem = [path: string, label: string, icon: string, more?: boolean]
 
 const NAV: Record<string, NavItem[]> = {
-  sme: [['/app', 'Overview', 'OV'], ['/app/profile', 'Business profile', 'PF'], ['/app/verification', 'Verification', 'VR'],
-    ['/app/documents', 'Documents', 'DC'], ['/app/opportunities', 'Opportunities', 'OP'], ['/app/applications', 'Applications', 'AP'], ['/app/consortia', 'Consortia', 'CN'],
-    ['/app/feedback', 'Feedback', 'FB'], ['/app/security', 'Trust & security', 'SC']],
-  provider: [['/app', 'Overview', 'OV'], ['/app/post', 'Post opportunity', 'PO'], ['/app/shortlist', 'Shortlists', 'SL'],
-    ['/app/applications', 'Applications', 'AP'], ['/app/smes', 'Verified SMEs', 'SME'], ['/app/insights', 'Unlock Map', 'UM'], ['/app/impact', 'Impact', 'IM'], ['/app/feedback', 'Feedback', 'FB'], ['/app/security', 'Trust & security', 'SC']],
-  admin: [['/app/ecosystem', 'Ecosystem', 'EC'], ['/app/queue', 'Review queue', 'RQ'], ['/app/security', 'Trust & security', 'SC']],
+  sme: [['/app', 'Home', 'OV'], ['/app/opportunities', 'Opportunities', 'OP'], ['/app/documents', 'Documents', 'DC'],
+    ['/app/applications', 'Applications', 'AP'], ['/app/profile', 'Business profile', 'PF'],
+    ['/app/verification', 'Verification', 'VR', true], ['/app/consortia', 'Consortia', 'CN', true],
+    ['/app/feedback', 'Feedback', 'FB', true], ['/app/security', 'Trust & security', 'SC', true]],
+  provider: [['/app', 'Home', 'OV'], ['/app/post', 'Post opportunity', 'PO'], ['/app/shortlist', 'Shortlists', 'SL'],
+    ['/app/smes', 'Verified SMEs', 'SME'], ['/app/impact', 'Impact', 'IM'],
+    ['/app/applications', 'Applications', 'AP', true], ['/app/insights', 'Unlock Map', 'UM', true],
+    ['/app/feedback', 'Feedback', 'FB', true], ['/app/security', 'Trust & security', 'SC', true]],
+  admin: [['/app/ecosystem', 'Ecosystem', 'EC'], ['/app/queue', 'Review queue', 'RQ'], ['/app/security', 'Trust & security', 'SC', true]],
 }
 
 const TITLES: [string, string][] = [
@@ -60,9 +63,14 @@ export default function Shell() {
       <aside className="sidebar">
         <Link to="/app" className="brand"><Logo dark /></Link>
         <nav className="side-nav" aria-label="Main">
-          {navFor(me.role).map(([to, label, icon]) => (
+          {navFor(me.role).filter((n) => !n[3]).map(([to, label, icon]) => (
             <NavLink key={to} to={to} end={to === '/app'} className={({ isActive }) => (isActive ? 'active' : '')}>
               <span className="nav-icon"><Icon name={ICON[icon] ?? 'sparkles'} size={18} /></span><span>{label}</span>
+            </NavLink>))}
+          {navFor(me.role).some((n) => n[3]) && <div className="nav-more-label">More</div>}
+          {navFor(me.role).filter((n) => n[3]).map(([to, label, icon]) => (
+            <NavLink key={to} to={to} className={({ isActive }) => `secondary ${isActive ? 'active' : ''}`}>
+              <span className="nav-icon"><Icon name={ICON[icon] ?? 'sparkles'} size={16} /></span><span>{label}</span>
             </NavLink>))}
         </nav>
         <div className="side-spacer" />

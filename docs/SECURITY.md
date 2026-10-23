@@ -171,3 +171,7 @@ and the demo asks for sample files. Feedback is opinion, so it is disputable, ne
 Honest limit: the text a person types into semantic search is sent to the embedding service. It is not
 stored, and the page says what is compared.
 
+| Control | Where | Proven by |
+|---|---|---|
+| The passport is off until the business turns it on, shows no turnover, ownership or contact details, labels mock checks, and a rotated or disabled link stops working at once | `routers/passport.py` | `test_readiness_passport_is_shared_by_choice_and_exposes_only_safe_facts` |
+

@@ -6,9 +6,10 @@ import {
 } from '../api'
 import { useAuth } from '../auth'
 import { ProfileHealth, ReadWithAi, SemanticSearch } from '../components/AiPanels'
+import { PassportCard } from '../components/PassportCard'
 import { useLoad } from '../hooks'
 import {
-  Badge, ErrorNote, GapCard, Logo, Metric, MiniBar, Panel, QuadrantBadge, ScoreRing, Spinner, VerificationRow, Welcome, useToast,
+  Badge, ErrorNote, Logo, MiniBar, Panel, QuadrantBadge, ScoreRing, Spinner, VerificationRow, Welcome, useToast,
 } from '../ui'
 
 /* ------------------------------------------------------------------ helpers */
@@ -66,46 +67,46 @@ export function SmeOverview() {
   if (prof.data && !prof.data.profile) return <Navigate to="/onboarding" replace />
   const p = prof.data!
   const matches = dash.data?.matches ?? []
-  const high = matches.filter((m) => m.fit >= 60).length
   const checks = latestChecks(p.verifications)
   const done = checks.filter((c) => isOk(c.v)).length
   const best = matches.slice().sort((a, b) => b.fit + b.readiness - (a.fit + a.readiness))[0]
   const step = nextStep(p, checks, dash.data?.open_gaps ?? [], best, apps.data?.length ?? 0)
+  const first = me?.full_name.split(' ')[0] ?? ''
+  const gaps = dash.data?.open_gaps ?? []
+  const blocked = new Set(gaps.flatMap((g) => g.blocks))
+  const locked = matches.filter((m) => blocked.has(m.opportunity)).reduce((sum, m) => sum + m.contract_value, 0)
+  const journey: [string, boolean][] = [
+    ['Profile', p.completion.percent >= 100], ['Verified', done === checks.length],
+    ['Documents in order', gaps.length === 0], ['Applied', (apps.data?.length ?? 0) > 0],
+  ]
+  const firstOpen = journey.findIndex(([, ok]) => !ok)
   return (
     <>
-      <Welcome hero eyebrow="SME workspace" title={`Welcome, ${me?.full_name.split(' ')[0]}`}
-        text={p.completion.percent >= 100 ? 'Your profile is complete. Keep documents current to stay award-ready.' : 'Complete the remaining steps to unlock more matches and shorten the time to award.'}
-        action={p.completion.percent < 100 ? <Link className="btn btn-primary" to="/app/verification">Complete verification</Link> : undefined} />
-      <div className="next-step">
-        <div><small>Your next best step</small><h3>{step.title}</h3><p>{step.text}</p></div>
-        {step.to && <Link className="btn btn-primary" to={step.to}>{step.cta}</Link>}
-      </div>
-      <div className="metric-grid">
-        <Metric label="Profile completion" value={`${p.completion.percent}%`} note={`${p.completion.steps.filter((s) => s.done).length} of ${p.completion.steps.length} steps done`} />
-        <Metric label="Verification" value={`${done}/${checks.length}`} tone={done === checks.length ? '#16a34a' : '#d97706'} note={done === checks.length ? 'All checks passed' : `${checks.length - done} need attention`} />
-        <Metric label="High-fit matches" value={high} note={`${matches.length} ${matches.length === 1 ? 'match' : 'matches'} in total`} />
-        <Metric label="Applications" value={apps.data?.length ?? 0} note={`${apps.data?.filter((a) => a.status === 'shortlisted').length ?? 0} shortlisted`} />
-      </div>
+      <section className="unlock-hero">
+        <div>
+          <small>{locked > 0 ? `${first}, this is waiting for you` : `Welcome, ${first}`}</small>
+          {locked > 0
+            ? <><h1>{zar(locked)}</h1><p>of opportunities are one step away. {step.title}.</p></>
+            : <><h1>You are award ready</h1><p>{step.text}</p></>}
+          {step.to && <Link className="btn btn-light" to={step.to}>{step.cta}</Link>}
+        </div>
+        {best && <div className="unlock-side"><ScoreRing value={best.fit} label="Fit" /><ScoreRing value={best.readiness} label="Ready" color="#f59e0b" /></div>}
+      </section>
+      <ol className="journey" aria-label="Your progress">
+        {journey.map(([label, ok], i) => (
+          <li key={label} className={ok ? 'done' : i === firstOpen ? 'now' : ''}><span>{ok ? '✓' : i + 1}</span>{label}</li>))}
+      </ol>
       <div className="grid-2">
-        <Panel title="Verification status" sub="Independent checks increase the trust providers place in you." right={<Badge tone={done === checks.length ? 'green' : 'amber'}>{done === checks.length ? 'Complete' : `${checks.length - done} action`}</Badge>}>
-          {checks.map((c) => <CheckRow key={c.key} label={c.label} note={c.note} v={c.v} />)}
-        </Panel>
+        <PassportCard />
         <Panel title="Best match" sub="Highest combined fit and readiness." right={best && <QuadrantBadge q={best.quadrant} />}>
           {best ? <>
             <h4 style={{ margin: '0 0 4px' }}>{best.opportunity}</h4>
             <p className="hint">{zar(best.contract_value)} · {best.gate === 'pass' ? 'All mandatory requirements met' : 'Mandatory documents outstanding'}</p>
-            <div className="score-pair" style={{ margin: '16px 0' }}>
-              <ScoreRing value={best.fit} label="Fit" /><ScoreRing value={best.readiness} label="Ready" color="#f59e0b" />
-            </div>
-            <Link className="btn btn-primary btn-full" to={`/app/matches/${best.match_id}`}>View match explanation</Link>
-          </> : <div className="empty"><strong>No matches yet</strong>Providers run matching when they publish an opportunity.</div>}
+            <Link className="btn btn-primary btn-full" style={{ marginTop: 12 }} to={`/app/matches/${best.match_id}`}>See why</Link>
+          </> : <div className="empty"><strong>No matches yet</strong>Buyers run matching when they publish an opportunity.</div>}
         </Panel>
       </div>
       {dash.data && dash.data.open_gaps.length > 0 && <UnlockPlan gaps={dash.data.open_gaps} />}
-      {dash.data && dash.data.open_gaps.length > 0 && (
-        <Panel title="What stands between you and awards" sub="Each credential, who issues it, how long it takes and what it costs.">
-          <div className="grid-gaps">{dash.data.open_gaps.map((g) => <GapCard key={g.credential} g={g} blocks={g.blocks} />)}</div>
-        </Panel>)}
       <Panel title="Top matches" right={<Link className="btn btn-outline btn-small" to="/app/opportunities">All opportunities</Link>}>
         {matches.length ? <div className="table-wrap"><table>
           <thead><tr><th>Opportunity</th><th>Value</th><th>Fit</th><th>Readiness</th><th>Position</th><th /></tr></thead>

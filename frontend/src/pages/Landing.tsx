@@ -1,3 +1,4 @@
+import TwoStories from '../components/TwoStories'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, zar, type Role, type Showcase } from '../api'
@@ -46,7 +47,7 @@ export default function Landing({ initialAuth }: { initialAuth?: 'login' | 'sign
     <>
       <header className="topbar">
         <Logo />
-        <nav className="topnav"><a href="#how">How it works</a><a href="#different">What's different</a><a href="#trust">Trust &amp; security</a><a href="#users">Who it serves</a></nav>
+        <nav className="topnav"><a href="#stories">See it</a><a href="#how">How it works</a><a href="#different">What's different</a><a href="#trust">Trust &amp; security</a><a href="#users">Who it serves</a></nav>
         <div className="top-actions">
           {me ? <button className="btn btn-primary" onClick={() => nav(homeFor(me.role))}>Open workspace</button> : <>
             <button className="btn btn-ghost" onClick={() => open('login')}>Log in</button>
@@ -125,6 +126,8 @@ export default function Landing({ initialAuth }: { initialAuth?: 'login' | 'sign
           </div>
           <p className="hint" style={{ textAlign: 'center', marginTop: 12 }}>Counts above are read live from the platform's demo data.</p>
         </section>
+
+        <TwoStories />
 
         <section className="section" id="how">
           <div className="section-head"><span>HOW IT WORKS</span><h2>From verified profile to a decision you can defend</h2><p>One journey for SMEs and the organisations that source from them.</p></div>

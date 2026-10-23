@@ -75,7 +75,7 @@ jobs:
             --spec-version 1.6 --output-file ../sbom/frontend.cdx.json
       - name: Licence check (fails on GPL, AGPL, SSPL or undeclared licences)
         run: python scripts/check_licenses.py sbom/backend.cdx.json sbom/frontend.cdx.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sbom-${{ github.sha }}
           path: sbom/

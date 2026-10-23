@@ -11,8 +11,8 @@ from ..audit import write_audit
 from ..auth import require_role
 from ..db import get_db
 from ..llm import client, prompts
-from ..schemas import ExtractIn, ProfileIn
-from ..services import blockers_for
+from ..schemas import ExtractIn, ProfileIn, SimulateIn
+from ..services import blockers_for, simulate
 from .applications import application_status
 from .auth import record_organisation_checks
 
@@ -288,3 +288,14 @@ def my_opportunities(user: m.User = Depends(require_role("sme")), db: Session = 
             }
         )
     return out
+
+
+@router.post("/me/simulate")
+def unlock_plan(
+    body: SimulateIn, user: m.User = Depends(require_role("sme")), db: Session = Depends(get_db)
+):
+    """The Unlock Plan: re-run the real rules as if these credentials were obtained."""
+    result = simulate(db, user.organisation_id, body.credentials)
+    if result is None:
+        raise HTTPException(404, "Complete your profile first")
+    return result

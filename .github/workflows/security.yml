@@ -9,6 +9,7 @@ permissions:
 jobs:
   # CodeQL is free on public repos only. Remove this job if the repository stays private.
   codeql:
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

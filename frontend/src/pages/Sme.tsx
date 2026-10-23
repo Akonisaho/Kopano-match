@@ -1,8 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import {
   api, dateFmt, daysUntil, isProvider, KIND_LABEL, pretty, zar,
-  type Kind, type Profile, type ProfileResponse, type Taxonomy, type Verification,
+  type Gap, type Kind, type Profile, type ProfileResponse, type Taxonomy, type UnlockResult, type Verification,
 } from '../api'
 import { useAuth } from '../auth'
 import { useLoad } from '../hooks'
@@ -100,6 +100,7 @@ export function SmeOverview() {
           </> : <div className="empty"><strong>No matches yet</strong>Providers run matching when they publish an opportunity.</div>}
         </Panel>
       </div>
+      {dash.data && dash.data.open_gaps.length > 0 && <UnlockPlan gaps={dash.data.open_gaps} />}
       {dash.data && dash.data.open_gaps.length > 0 && (
         <Panel title="What stands between you and awards" sub="Each credential, who issues it, how long it takes and what it costs.">
           <div className="grid-gaps">{dash.data.open_gaps.map((g) => <GapCard key={g.credential} g={g} blocks={g.blocks} />)}</div>
@@ -114,6 +115,60 @@ export function SmeOverview() {
         </table></div> : <div className="empty"><strong>No matches yet</strong></div>}
       </Panel>
     </>
+  )
+}
+
+/* ------------------------------------------------------------------ unlock plan */
+
+/** A what-if. Tick the documents you plan to get; the same rules re-score every opportunity. */
+function UnlockPlan({ gaps }: { gaps: (Gap & { blocks: string[] })[] }) {
+  const toast = useToast()
+  const [picked, setPicked] = useState<string[]>(() => gaps.map((g) => g.credential))
+  const [plan, setPlan] = useState<UnlockResult | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (!picked.length) { setPlan(null); return }
+    let live = true
+    setBusy(true)
+    api.simulate(picked).then((r) => live && setPlan(r)).catch((e) => toast((e as Error).message, 'error')).finally(() => live && setBusy(false))
+    return () => { live = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picked.join(',')])
+
+  const toggle = (c: string) => setPicked(picked.includes(c) ? picked.filter((x) => x !== c) : [...picked, c])
+  const changed = plan?.opportunities.filter((o) => o.newly_award_ready || (o.before?.quadrant !== o.after.quadrant)) ?? []
+  const gain = plan ? plan.after.value - plan.before.value : 0
+
+  return (
+    <Panel title="Your Unlock Plan" sub="Tick the documents you plan to get. The real rules re-score every opportunity. Nothing is saved." right={<Badge tone="purple">What if</Badge>}>
+      <div className="grid-2" style={{ gridTemplateColumns: '1fr 1.2fr' }}>
+        <div>
+          {gaps.map((g) => (
+            <label key={g.credential} className="check-row" style={{ alignItems: 'center', margin: '0 0 10px', padding: 12, border: '1px solid var(--line)', borderRadius: 12, background: picked.includes(g.credential) ? '#faf5ff' : '#fff' }}>
+              <input type="checkbox" checked={picked.includes(g.credential)} onChange={() => toggle(g.credential)} />
+              <span style={{ flex: 1 }}><b>{g.label}</b><br /><small className="hint">{g.issuer} · {g.days} days · {g.cost_zar ? zar(g.cost_zar) : 'no cost'}</small></span>
+            </label>))}
+        </div>
+        <div>
+          {!plan ? <div className="empty">{picked.length ? 'Working it out…' : 'Tick at least one document to see what it unlocks.'}</div> : <>
+            <div className="metric-grid" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 12, opacity: busy ? 0.6 : 1 }}>
+              <div className="metric"><span>Award-ready opportunities</span><b>{plan.before.award_ready} → <span style={{ color: '#7c3aed' }}>{plan.after.award_ready}</span></b><small>after these documents</small></div>
+              <div className="metric"><span>Contract value you can be awarded</span><b style={{ fontSize: 22 }}>{zar(plan.before.value)} → <span style={{ color: '#7c3aed' }}>{zar(plan.after.value)}</span></b><small>{gain > 0 ? `+${zar(gain)}` : 'no change'}</small></div>
+            </div>
+            <p style={{ margin: '0 0 10px', fontSize: 13, color: '#475467' }}>
+              <b>{plan.total_days} days and {zar(plan.total_cost_zar)}</b> in total. The documents are obtained at the same time, so the wait is the longest one.</p>
+            {changed.length > 0 ? <div className="table-wrap"><table>
+              <thead><tr><th>Opportunity</th><th>Now</th><th>After</th></tr></thead>
+              <tbody>{changed.map((o) => (
+                <tr key={o.opportunity_id}><td><b>{o.title}</b><br /><small>{zar(o.contract_value)}</small></td>
+                  <td>{o.before ? <QuadrantBadge q={o.before.quadrant} /> : <Badge tone="gray">Not matched</Badge>}</td>
+                  <td><QuadrantBadge q={o.after.quadrant} />{o.newly_award_ready && <> <Badge tone="green">Newly award-ready</Badge></>}</td></tr>))}</tbody>
+            </table></div> : <p className="hint">These documents do not change any opportunity's position.</p>}
+          </>}
+        </div>
+      </div>
+    </Panel>
   )
 }
 

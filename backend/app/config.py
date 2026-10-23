@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     identity_provider: str = "mock"
     registry_provider: str = "mock"
     tax_provider: str = "mock"
+    scanner_provider: str = "mock"
 
     llm_provider: str = "gemini"
     gemini_api_key: str = ""

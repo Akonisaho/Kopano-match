@@ -8,12 +8,28 @@
 from ..config import settings
 from .base import (
     IdentityProvider,
+    MalwareScanner,
+    ScanResult,
     RegistryProvider,
     TaxProvider,
     VerificationResult,
 )
 
 NON_COMPLIANT_REGISTRATIONS = {"2018/100011/06"}
+
+
+# The standard antivirus test string, built in two parts so this source file is not itself
+# quarantined by an antivirus. It is harmless and is how scanners are tested.
+_EICAR = rb"X5O!P%@AP[4\PZX54(P^)7CC)7}$" + b"EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+
+
+class MockMalwareScanner(MalwareScanner):
+    """Catches only the standard test signature. It proves the pipeline, not real protection."""
+
+    def scan(self, data: bytes) -> ScanResult:
+        if _EICAR in data:
+            return ScanResult(False, "EICAR-Test-File", "mock scanner (test signature only)")
+        return ScanResult(True, None, "mock scanner (test signature only)")
 
 
 class MockIdentityProvider(IdentityProvider):
@@ -40,6 +56,7 @@ _PROVIDERS = {
     "identity": {"mock": MockIdentityProvider},
     "registry": {"mock": MockRegistryProvider},
     "tax": {"mock": MockTaxProvider},
+    "scanner": {"mock": MockMalwareScanner},
 }
 
 
@@ -56,6 +73,10 @@ def identity_provider() -> IdentityProvider:
 
 def registry_provider() -> RegistryProvider:
     return _build("registry", settings.registry_provider)
+
+
+def malware_scanner() -> MalwareScanner:
+    return _build("scanner", settings.scanner_provider)
 
 
 def tax_provider() -> TaxProvider:

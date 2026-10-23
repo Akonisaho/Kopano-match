@@ -35,12 +35,12 @@ export default function ResetPassword() {
             <Link className="btn btn-outline btn-full" to="/login">Back to log in</Link>
           </> : <form onSubmit={submit}>
             <h1 className="form-title">Choose a new password</h1>
-            <p className="form-sub">At least 12 characters. This link works once.</p>
+            <p className="form-sub">12 to 72 characters. This link works once.</p>
             <ErrorNote error={error} />
             <div className="field"><label htmlFor="np">New password</label>
-              <input id="np" type="password" minLength={12} required autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} /></div>
+              <input id="np" type="password" minLength={12} maxLength={72} required autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} /></div>
             <div className="field"><label htmlFor="np2">Repeat it</label>
-              <input id="np2" type="password" minLength={12} required autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} /></div>
+              <input id="np2" type="password" minLength={12} maxLength={72} required autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} /></div>
             <button className="btn btn-primary btn-full" disabled={busy}>{busy ? 'Saving…' : 'Change password'}</button>
           </form>}
         </div>

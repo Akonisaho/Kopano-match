@@ -680,3 +680,28 @@ def test_two_step_sign_in_end_to_end():
     )
     plain = client.post("/auth/login", data={"username": email, "password": "a-long-test-password"})
     assert "access_token" in plain.json()
+
+
+def test_overlong_passwords_get_a_clear_422_not_a_server_error():
+    base = {
+        "email": f"{uuid.uuid4().hex[:8]}@kopano-test.com",
+        "full_name": "Long Password",
+        "role": "sme",
+        "organisation_name": "Long Org",
+        "consent": True,
+    }
+    r = client.post("/auth/register", json={**base, "password": "A" * 100})
+    assert r.status_code == 422
+    r = client.post(
+        "/auth/register", json={**base, "password": "é" * 50}
+    )  # 100 bytes in 50 characters
+    assert r.status_code == 422
+    assert (
+        client.post("/auth/reset", json={"token": "x" * 40, "new_password": "B" * 100}).status_code
+        == 422
+    )
+    ok = client.post("/auth/register", json={**base, "password": "C" * 72})
+    assert ok.status_code == 201
+    # signing in with an absurdly long password is a plain refusal, never a crash
+    login_long = client.post("/auth/login", data={"username": base["email"], "password": "D" * 500})
+    assert login_long.status_code == 401

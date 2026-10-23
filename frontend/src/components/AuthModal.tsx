@@ -114,7 +114,7 @@ export default function AuthModal({ mode, role, roles, setMode, setRole, onClose
             <div className="form-grid">
               <div className="field"><label htmlFor="r">Registration number</label><input id="r" value={f.registration_number} onChange={set('registration_number')} placeholder="2018/123456/07" />
                 <span className="hint">Checked against a registry adapter (simulated in this pilot).</span></div>
-              <div className="field"><label htmlFor="p">Password</label><input id="p" type="password" required minLength={12} autoComplete="new-password" value={f.password} onChange={set('password')} placeholder="Minimum 12 characters" /></div>
+              <div className="field"><label htmlFor="p">Password</label><input id="p" type="password" required minLength={12} maxLength={72} autoComplete="new-password" value={f.password} onChange={set('password')} placeholder="12 to 72 characters" /></div>
             </div>
             <label className="check-row"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
               <span>I have read the <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: 'var(--purple)' }}>privacy notice</a> and consent to my information being processed as described.</span></label>

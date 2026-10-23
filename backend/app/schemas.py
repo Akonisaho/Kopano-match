@@ -8,6 +8,14 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, mo
 from .engine.taxonomy import CAPABILITIES, COMPLIANCE_CATALOGUE, PROVINCES, SECTORS
 from .engine.types import READINESS_TYPES, RequirementType
 
+
+def _fits_bcrypt(value: str) -> str:
+    """bcrypt reads at most 72 bytes. Refuse longer passwords with a clear message, not a crash."""
+    if len(value.encode()) > 72:
+        raise ValueError("Passwords can be at most 72 characters")
+    return value
+
+
 OWNERSHIP_FLAGS = ("youth", "black", "black_women")
 
 
@@ -17,7 +25,7 @@ class Strict(BaseModel):
 
 class RegisterIn(Strict):
     email: EmailStr
-    password: str = Field(min_length=12, max_length=128)
+    password: str = Field(min_length=12, max_length=72)
     full_name: str = Field(min_length=2, max_length=200)
     phone: str | None = Field(default=None, max_length=40)
     role: Literal[
@@ -26,6 +34,8 @@ class RegisterIn(Strict):
     organisation_name: str = Field(min_length=2, max_length=200)
     registration_number: str | None = Field(default=None, max_length=40)
     consent: bool
+
+    _password_limit = field_validator("password")(_fits_bcrypt)
 
     @field_validator("consent")
     @classmethod
@@ -156,7 +166,8 @@ class ForgotIn(Strict):
 
 class ResetIn(Strict):
     token: str = Field(min_length=20, max_length=200)
-    new_password: str = Field(min_length=12, max_length=128)
+    new_password: str = Field(min_length=12, max_length=72)
+    _password_limit = field_validator("new_password")(_fits_bcrypt)
 
 
 class MfaCodeIn(Strict):

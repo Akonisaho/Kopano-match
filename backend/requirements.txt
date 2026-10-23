@@ -4,7 +4,7 @@ uvicorn[standard]==0.30.6
 sqlalchemy==2.0.35
 psycopg2-binary==2.9.9
 pydantic==2.9.2
-pydantic-settings==2.5.2
+pydantic-settings==2.16.1
 email-validator==2.2.0
 python-multipart==0.0.32
 bcrypt==4.2.0

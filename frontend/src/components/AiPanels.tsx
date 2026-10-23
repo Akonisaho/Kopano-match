@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, dateFmt, pretty, QUADRANT_LABEL, zar, type Doc, type DocReading, type ImportResult, type OppHit, type Performance, type Semantic, type SmeHit } from '../api'
 import { useLoad } from '../hooks'
@@ -8,14 +8,27 @@ import { Badge, Modal, Panel, Spinner, useToast } from '../ui'
 const LEVEL_TONE: Record<string, string> = { ok: 'green', warn: 'amber', info: 'blue' }
 
 /** AI reads one uploaded document. Opt-in per document, checked against the account, saved only on a click. */
-export function ReadWithAi({ doc, onClose, onChanged }: { doc: Doc; onClose: () => void; onChanged: () => void }) {
+export function ReadWithAi({ doc, onClose, onChanged, auto }: { doc: Doc; onClose: () => void; onChanged: () => void; auto?: boolean }) {
   const toast = useToast()
   const [busy, setBusy] = useState(false)
   const [res, setRes] = useState<DocReading | null>(null)
+  const [filled, setFilled] = useState<string | null>(null)
   async function run() {
     setBusy(true)
-    try { setRes(await api.readDocument(doc.id)) } catch (err) { toast((err as Error).message, 'error') } finally { setBusy(false) }
+    try {
+      const r = await api.readDocument(doc.id)
+      setRes(r)
+      // Read on this computer and no date was typed: take it from the document
+      if (auto && r.source === 'local' && r.draft?.expiry_date && !doc.expiry_date) {
+        await api.setExpiry(doc.id, r.draft.expiry_date)
+        setFilled(r.draft.expiry_date)
+        onChanged()
+      }
+    } catch (err) { toast((err as Error).message, 'error') } finally { setBusy(false) }
   }
+  const mode = useLoad(() => api.mode().catch(() => null))
+  const here = mode.data?.ai === 'local'
+  useEffect(() => { if (auto) run() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   async function useExpiry(d: string) {
     try { await api.setExpiry(doc.id, d); toast('Expiry date updated.'); onChanged(); onClose() } catch (err) { toast((err as Error).message, 'error') }
   }
@@ -42,19 +55,20 @@ export function ReadWithAi({ doc, onClose, onChanged }: { doc: Doc; onClose: () 
     ['Province', d.province], ['Annual turnover', d.annual_turnover ? `R${d.annual_turnover.toLocaleString('en-ZA')}` : null],
     ['Years trading', d.years_trading], ['Capabilities', d.capability_codes.length ? d.capability_codes.join(', ') : null],
   ] : []
-  const hasProfileFacts = !!d && (d.sector || d.province || d.annual_turnover || d.years_trading || d.capability_codes.length)
+  const hasProfileFacts = !!d && Boolean(d.sector || d.province || d.annual_turnover || d.years_trading || d.capability_codes.length)
   return (
-    <Modal onClose={onClose}>
-      <h3 style={{ margin: '0 0 4px' }}>Read {doc.document_type} with AI</h3>
+    <Modal small onClose={onClose}><div className="modal-pad">
+      <h3 style={{ margin: '0 0 4px' }}>{here ? `Reading your ${doc.document_type}` : `Read ${doc.document_type} with AI`}</h3>
       {!res && <>
-        <p className="hint">This sends the file to Google's Gemini service so it can read the text. Use it on sample or non-sensitive documents in this demo. The request is written to your audit log, and nothing is saved until you choose to.</p>
+        {busy ? <div className="reading"><i /><span>{here ? 'Reading the document and checking it against your account…' : 'Reading the certificate and checking it against your account…'}</span></div> : <p className="hint">{here ? 'The file is read on this computer and is not sent anywhere. Nothing is saved until you choose to.' : "This sends the file to Google's Gemini service so it can read the text. Use it on sample or non-sensitive documents in this demo. The request is written to your audit log, and nothing is saved until you choose to."}</p>}
         <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
           <button className="btn btn-outline" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" disabled={busy} onClick={run}>{busy ? 'Reading…' : 'Read this document'}</button></div></>}
-      {res?.source === 'unavailable' && <><p className="callout amber">The AI reader is not available right now, so nothing was read. Nothing was changed. Try again in a moment.</p>
+      {res?.source === 'unavailable' && <><p className="callout amber">{here ? 'There is no readable text in this file (it may be a scan), so nothing was read. Type the details in instead.' : 'The AI reader is not available right now, so nothing was read. Nothing was changed. Try again in a moment.'}</p>
         <div className="table-actions" style={{ justifyContent: 'flex-end' }}><button className="btn btn-outline" onClick={onClose}>Close</button></div></>}
-      {res?.source === 'ai' && d && <>
-        <p className="hint" style={{ marginTop: 0 }}>An AI draft. Check it against the document before you use it.</p>
+      {(res?.source === 'ai' || res?.source === 'local') && d && <>
+        <p className="hint" style={{ marginTop: 0 }}>{res.source === 'local' ? 'Read on this computer, nothing sent anywhere. Check it against the document before you use it.' : 'An AI draft. Check it against the document before you use it.'}</p>
+        {filled && <p className="callout green" style={{ margin: '0 0 8px', fontSize: 13 }}><Badge tone="green">Filled in</Badge> Expiry date {dateFmt(filled)}, taken from the document.</p>}
         {res.checks.map((c, i) => <p key={i} className={`callout ${c.level === 'ok' ? 'green' : c.level === 'warn' ? 'amber' : 'gray'}`} style={{ margin: '0 0 8px', fontSize: 13 }}><Badge tone={LEVEL_TONE[c.level]}>{c.level === 'ok' ? 'Consistent' : c.level === 'warn' ? 'Check' : 'Note'}</Badge> {c.text}</p>)}
         <div className="table-wrap" style={{ margin: '12px 0' }}><table><tbody>{rows.map(([k, v]) => (
           <tr key={k}><td className="hint" style={{ width: 150 }}>{k}</td><td>{v ?? <span className="hint">not stated</span>}</td></tr>))}</tbody></table></div>
@@ -62,7 +76,7 @@ export function ReadWithAi({ doc, onClose, onChanged }: { doc: Doc; onClose: () 
           {d.expiry_date && String(doc.expiry_date) !== d.expiry_date && <button className="btn btn-outline" onClick={() => useExpiry(d.expiry_date!)}>Use expiry {dateFmt(d.expiry_date)}</button>}
           {hasProfileFacts && <button className="btn btn-outline" onClick={fillProfile}>Add to my profile</button>}
           <button className="btn btn-primary" onClick={onClose}>Done</button></div></>}
-    </Modal>
+    </div></Modal>
   )
 }
 
@@ -91,7 +105,7 @@ export function MeaningCheck({ matchId }: { matchId: string }) {
   }
   return (
     <Panel title="Meaning check" sub="Reads the opportunity text and the business capabilities by meaning, not keywords."
-      right={<Badge tone="purple">{s ? (s.source === 'ai' ? 'AI · advisory' : 'Keywords · advisory') : 'Advisory'}</Badge>}>
+      right={<Badge tone="purple">{s ? (s.source === 'ai' ? 'AI · advisory' : s.source === 'local' ? 'Local analysis · advisory' : 'Keywords · advisory') : 'Advisory'}</Badge>}>
       {!s && <><p className="hint" style={{ marginTop: 0 }}>It sees no business name, no ownership and no size. It sits beside the score and never changes a score, a gate or a shortlist.</p>
         <button className="btn btn-outline" disabled={busy} onClick={run}>{busy ? 'Reading…' : 'Run the meaning check'}</button></>}
       {s && <>

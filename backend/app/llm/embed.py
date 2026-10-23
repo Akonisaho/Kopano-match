@@ -9,6 +9,7 @@ import math
 import urllib.request
 
 from ..config import settings
+from . import local
 
 TIMEOUT_SECONDS = 20
 DIMENSIONS = 768
@@ -43,7 +44,11 @@ def _call(texts: list[str], task: str) -> list[list[float]]:
 
 def embed(texts: list[str], task: str = "RETRIEVAL_DOCUMENT") -> list[list[float]] | None:
     """task: RETRIEVAL_DOCUMENT for things searched, RETRIEVAL_QUERY for what someone typed."""
-    if not texts or settings.llm_provider != "gemini" or not settings.gemini_api_key:
+    if not texts:
+        return None
+    if settings.llm_provider == "local":
+        return local.embed(texts)
+    if settings.llm_provider != "gemini" or not settings.gemini_api_key:
         return None
     try:
         out: list[list[float]] = []
@@ -66,5 +71,9 @@ def cosine(a: list[float], b: list[float]) -> float:
 FLOOR, CEIL = 0.45, 0.95
 
 
+LOCAL_FLOOR, LOCAL_CEIL = 0.04, 0.55  # hashed word vectors spread differently
+
+
 def calibrated(c: float) -> int:
-    return max(0, min(100, round(100 * (c - FLOOR) / (CEIL - FLOOR))))
+    lo, hi = (LOCAL_FLOOR, LOCAL_CEIL) if settings.llm_provider == "local" else (FLOOR, CEIL)
+    return max(0, min(100, round(100 * (c - lo) / (hi - lo))))

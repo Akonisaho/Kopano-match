@@ -61,7 +61,7 @@ function RatingForm({ appId, sme, onDone, onClose }: { appId: string; sme: strin
     catch (err) { toast((err as Error).message, 'error') } finally { setBusy(false) }
   }
   return (
-    <Modal onClose={onClose}>
+    <Modal small onClose={onClose}><div className="modal-pad">
       <h3 style={{ margin: '0 0 4px' }}>Rate {sme}</h3>
       <p className="hint" style={{ marginTop: 0 }}>Rate the work, not the person. The business sees this and can respond or dispute it.</p>
       {CRITERIA.map(([k, label]) => (
@@ -74,7 +74,7 @@ function RatingForm({ appId, sme, onDone, onClose }: { appId: string; sme: strin
         <button className="btn btn-outline" onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" disabled={!complete || busy} onClick={submit}>{busy ? 'Sending…' : 'Send feedback'}</button>
       </div>
-    </Modal>
+    </div></Modal>
   )
 }
 

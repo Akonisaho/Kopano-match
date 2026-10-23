@@ -155,6 +155,10 @@ export const api = {
   passport: () => request<PassportState>('/smes/me/passport'),
   passportAction: (kind: 'enable' | 'rotate' | 'disable') => request<PassportState>(`/smes/me/passport/${kind}`, json('POST')),
   publicPassport: (token: string) => request<PassportView>(`/passport/${encodeURIComponent(token)}`),
+  mode: () => request<{ ai: 'local' | 'gemini' | 'anthropic' | 'off'; email: string }>('/meta/mode'),
+  publicOpportunities: () => request<PublicCard[]>('/public/opportunities'),
+  publicOpportunity: (id: string) => request<PublicDetail>(`/public/opportunities/${id}`),
+  publicPreview: (id: string, body: PreviewBody) => request<PublicPreview>(`/public/opportunities/${id}/preview`, json('POST', body)),
   importTemplate: async () => (await raw('/opportunities/import/template')).blob(),
 
   queue: () => request<Queue>('/admin/queue'),
@@ -372,7 +376,7 @@ export interface Performance {
   summary: null | { source: 'ai' | 'figures'; summary: string; strengths: string[]; development_areas: string[] }
 }
 export interface DocReading {
-  source: 'ai' | 'unavailable'; provider?: string
+  source: 'ai' | 'local' | 'unavailable'; provider?: string
   draft: null | {
     document_type: string | null; company_name: string | null; registration_number: string | null
     issuer: string | null; expiry_date: string | null; sector: string | null; province: string | null
@@ -381,7 +385,7 @@ export interface DocReading {
   checks: { level: 'ok' | 'warn' | 'info'; text: string }[]
 }
 export interface Semantic {
-  source: 'ai' | 'keywords'; score: number; matched_themes: string[]; concerns: string[]
+  source: 'ai' | 'local' | 'keywords'; score: number; matched_themes: string[]; concerns: string[]
   rationale: string; advisory: string; embedding_similarity?: number
 }
 export interface ImportResult { rows: number; created: number; errors: { row: number; error: string }[]; titles: string[] }
@@ -436,3 +440,23 @@ export interface PassportView {
   as_of: string; notice: string
 }
 export interface PassportState { enabled: boolean; link: string | null; qr: string | null; preview: PassportView }
+
+export interface PublicCard {
+  id: string; title: string; kind: Kind; sector: string; province: string; contract_value: number
+  deadline: string | null; provider: string | null
+}
+export interface PublicDetail extends PublicCard {
+  description: string | null; duration_months: number; payment_terms_days: number
+  scope: { label: string; value: number }[]
+  requirements: { text: string; mandatory: boolean; kind: string; days?: number; cost_zar?: number }[]
+  preference: string[]
+}
+export interface PreviewBody {
+  sector: string; province: string; years_trading: number; annual_turnover: number
+  capability_codes: string[]; documents: string[]
+}
+export interface PublicPreview {
+  gate: 'pass' | 'remediable' | 'fail'; quadrant: Quadrant; fit: number; readiness: number
+  components: Record<string, number>; gaps: Gap[]; risk: RiskFlags; fail_reasons: string[]; summary: string
+  unlock: { days: number; cost_zar: number; documents: number }; stored: false
+}

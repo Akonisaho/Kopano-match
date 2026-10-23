@@ -146,16 +146,27 @@ def run_matching(db: Session, opportunity_id: uuid.UUID) -> list[m.Match]:
                 sme_id=sme_id, opportunity_id=opportunity_id, model_version=r.model_version
             )
             db.add(row)
+        before = (row.explanation or {}) if row.id is not None else {}
+        was = (float(row.fit_score), float(row.readiness_score)) if row.id is not None else None
         row.gate = r.gate.value
         row.quadrant = r.quadrant
         row.fit_score = r.fit
         row.readiness_score = r.readiness
         row.overall_score = r.overall
-        prior = (row.explanation or {}).get("rationale")
+        prior = before.get("rationale")
         row.explanation = explanation_of(r)
-        if prior:
-            row.explanation["stale_rationale"] = prior  # regenerated lazily on next view
         row.risk_flags = risk_of(r)
+        unchanged = (
+            was == (float(r.fit), float(r.readiness))
+            and before.get("components") == row.explanation["components"]
+            and before.get("gaps") == row.explanation["gaps"]
+        )
+        if prior and unchanged:
+            # Same numbers, same words: keep the summary so the page opens instantly
+            row.explanation["rationale"] = prior
+            row.explanation["rationale_source"] = before.get("rationale_source")
+        elif prior:
+            row.explanation["stale_rationale"] = prior  # regenerated lazily on next view
         row.flagged = sme_id in under_review
         saved.append(row)
     # Matches that no longer pass the gate must not linger in the shortlist

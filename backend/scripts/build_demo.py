@@ -521,6 +521,29 @@ def main():
         "  BuildRight Contractors has not answered yet: sign in as that account to accept it live."
     )
 
+    print("Warming the AI results so every page opens instantly ...")
+    from concurrent.futures import ThreadPoolExecutor
+
+    jobs = []
+    for _title, (by_role, oid) in opp_ids.items():
+        _, rows = api.call("GET", f"/opportunities/{oid}/matches", ptoken[by_role])
+        for row in rows if isinstance(rows, list) else []:
+            jobs.append((ptoken[by_role], row["match_id"], row["sme_id"]))
+
+    def warm(job):
+        tok, mid, sid = job
+        api.call("GET", f"/matches/{mid}", tok)
+        api.call("GET", f"/matches/{mid}/semantic", tok)
+        api.call("GET", f"/feedback/performance/{sid}", tok)
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        list(pool.map(warm, jobs))
+    api.call(
+        "POST", "/smes/me/search", next(iter(stokens.values())), body={"query": "road construction"}
+    )
+    api.call("POST", "/providers/search", ptoken["buyer"], body={"query": "road construction"})
+    print(f"  {len(jobs)} matches ready.")
+
     print("\nDone. Sign in with password:", args.password)
     for p in PROVIDERS:
         print(f"  {p['role']:10} {plus(args.email, p['tag'])}   {p['name']}")

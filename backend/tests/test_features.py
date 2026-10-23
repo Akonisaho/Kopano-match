@@ -538,3 +538,130 @@ def test_uploading_a_missing_document_rescores_the_business_at_once():
         g["credential"] for g in after["open_gaps"]
     ]  # the gap closed without any rerun
     assert max(m["readiness"] for m in after["matches"]) >= ready_before
+
+
+def test_anyone_can_browse_open_opportunities_and_check_their_fit_without_an_account():
+    listed = client.get("/public/opportunities")  # no sign-in
+    assert listed.status_code == 200 and listed.json()
+    roads = next(o for o in listed.json() if o["title"] == "Provincial roads rehabilitation")
+    assert {"id", "title", "provider", "contract_value", "deadline"} <= set(roads)
+
+    detail = client.get(f"/public/opportunities/{roads['id']}").json()
+    assert detail["scope"] and any(r["mandatory"] for r in detail["requirements"])
+    assert any(r.get("days") for r in detail["requirements"])  # documents show their turnaround
+    assert client.get(f"/public/opportunities/{uuid.uuid4()}").status_code == 404
+
+    body = {
+        "sector": "construction",
+        "province": "Gauteng",
+        "years_trading": 8,
+        "annual_turnover": 9_000_000,
+        "capability_codes": ["CON-ROADS", "CON-CIVIL"],
+        "documents": [],
+    }
+    before = client.post(f"/public/opportunities/{roads['id']}/preview", json=body).json()
+    assert before["stored"] is False and before["gaps"] and before["unlock"]["documents"] >= 1
+    have_all = {**body, "documents": ["TCS", "BBBEE", "COID", "CIDB", "CSD"]}
+    after = client.post(f"/public/opportunities/{roads['id']}/preview", json=have_all).json()
+    assert after["readiness"] > before["readiness"] and after["unlock"]["documents"] == 0
+    wrong_place = {
+        **body,
+        "sector": "agriculture",
+        "province": "Western Cape",
+        "capability_codes": ["AGR-PROD"],
+    }
+    far = client.post(f"/public/opportunities/{roads['id']}/preview", json=wrong_place).json()
+    assert far["fit"] <= before["fit"]  # a poor fit is shown honestly, not hidden
+
+    # Bad input is refused, and nothing about the visitor is kept
+    assert (
+        client.post(
+            f"/public/opportunities/{roads['id']}/preview", json={**body, "sector": "mining"}
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            f"/public/opportunities/{roads['id']}/preview", json={**body, "documents": ["XYZ"]}
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            f"/public/opportunities/{roads['id']}/preview", json={**body, "extra": 1}
+        ).status_code
+        == 422
+    )
+    with engine.connect() as c:
+        assert (
+            c.execute(
+                text("select count(*) from core.matches where sme_id::text = 'visitor'")
+            ).scalar()
+            == 0
+        )
+
+
+def test_local_mode_reads_a_real_certificate_on_this_computer(monkeypatch):
+    import sys
+    from pathlib import Path
+
+    from app.config import settings
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from make_demo_documents import make_certificate
+
+    monkeypatch.setattr(settings, "llm_provider", "local")
+    expiry = date.today() + timedelta(days=400)
+    sme = register("sme")
+    pdf = make_certificate(f"Local Reader {uuid.uuid4().hex[:6]} Ltd", "COID", expiry)
+    up = client.post(
+        "/documents",
+        headers=sme,
+        data={"document_type": "COID", "expiry_date": str(expiry)},
+        files={"file": ("coid.pdf", pdf, "application/pdf")},
+    )
+    assert up.status_code == 201, up.text
+
+    r = client.post(f"/documents/{up.json()['id']}/extract", headers=sme).json()
+    assert r["source"] == "local"  # read here, nothing sent anywhere
+    d = r["draft"]
+    assert d["document_type"] == "COID" and d["expiry_date"] == str(expiry)
+    assert d["company_name"].startswith("Local Reader")
+    texts = " ".join(c["text"] for c in r["checks"])
+    assert (
+        "not " in texts or "Local Reader" in texts
+    )  # the company on the file is not this account: flagged
+
+    # A file with no readable text is reported honestly, not invented
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+    img = client.post(
+        "/documents",
+        headers=sme,
+        data={"document_type": "TCS"},
+        files={"file": ("scan.png", png + uuid.uuid4().bytes, "image/png")},
+    )
+    assert img.status_code == 201
+    none = client.post(f"/documents/{img.json()['id']}/extract", headers=sme).json()
+    assert none["source"] == "unavailable" and none["draft"] is None
+
+    mode = client.get("/meta/mode").json()
+    assert mode["ai"] == "local"
+
+    # The meaning check and search work in local mode, instantly
+    corp = login("corporate@kopano.demo")
+    mid = _match_id(corp, "Provincial roads rehabilitation", "Emerging Surfacing")
+    _clear_embeddings()
+    with engine.begin() as c:
+        c.execute(
+            text("delete from core.ai_insights where kind = 'semantic' and subject_id = :m"),
+            {"m": mid},
+        )
+    sem = client.get(f"/matches/{mid}/semantic", headers=corp).json()
+    assert (
+        sem["source"] == "local" and 0 <= sem["score"] <= 100 and sem["matched_themes"] is not None
+    )
+    found = client.post(
+        "/providers/search", headers=corp, json={"query": "road construction and civil engineering"}
+    ).json()
+    assert found["source"] == "embeddings" and found["results"][0]["similarity"] > 0
+    _clear_embeddings()

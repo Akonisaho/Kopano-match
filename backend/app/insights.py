@@ -10,6 +10,7 @@ import json
 import re
 import uuid
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -17,6 +18,7 @@ from sqlalchemy.orm import Session
 from . import models as m
 from .engine.taxonomy import CAPABILITIES, COMPLIANCE_CATALOGUE
 from .llm import client, prompts
+from .config import settings
 from .llm import embed as emb
 
 CRITERIA = {
@@ -155,11 +157,19 @@ def semantic(db: Session, match: m.Match) -> dict:
     hit = _cached(db, "semantic", match.id, h)
     if hit:
         return hit
-    result = client.call(
-        prompts.SEMANTIC.format(opportunity=opp_text, business=biz_text), prompts.SemanticRelevance
-    )
+    # The AI judgement and the embeddings are independent, so they run at the same time
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        pending = pool.submit(
+            client.call,
+            prompts.SEMANTIC.format(opportunity=opp_text, business=biz_text),
+            prompts.SemanticRelevance,
+        )
+        vecs = _vectors(db, [(opp.id, _opp_text(opp)), (match.sme_id, _sme_text(profile))])
+        result = pending.result()
     if result:
         out = {"source": "ai", **result.model_dump()}
+    elif settings.llm_provider == "local":
+        out = _local_judgement(opp, profile, caps, scope, vecs, opp.id, match.sme_id)
     else:
         want, have = _words(opp_text), _words(biz_text)
         shared = sorted(want & have)
@@ -170,12 +180,35 @@ def semantic(db: Session, match: m.Match) -> dict:
             "concerns": [],
             "rationale": "Keyword overlap only, because the AI reader is not available right now.",
         }
-    vecs = _vectors(db, [(opp.id, _opp_text(opp)), (match.sme_id, _sme_text(profile))])
     if vecs:
         out["embedding_similarity"] = emb.calibrated(emb.cosine(vecs[opp.id], vecs[match.sme_id]))
     out["advisory"] = "Shown beside the score. It never changes a score, a gate or a shortlist."
     _store(db, "semantic", match.id, h, out)
     return out
+
+
+def _local_judgement(opp, profile, caps, scope, vecs, opp_id, sme_id) -> dict:
+    """The meaning check with no outside service: scope coverage, sector, and word-vector similarity."""
+    have, want = {c.lower() for c in caps}, [s for s in scope]
+    covered = [s for s in want if s.lower() in have]
+    missing = [s for s in want if s.lower() not in have]
+    coverage = len(covered) / max(1, len(want))
+    sim = emb.calibrated(emb.cosine(vecs[opp_id], vecs[sme_id])) if vecs else 0
+    score = round(60 * coverage + 25 * (profile.sector == opp.sector) + 15 * sim / 100)
+    concerns = [f"No {m.lower()} listed" for m in missing[:2]]
+    if profile.province != opp.province:
+        concerns.append(f"Based in {profile.province}, work is in {opp.province}")
+    return {
+        "source": "local",
+        "score": min(100, score),
+        "matched_themes": covered[:4],
+        "concerns": concerns[:3],
+        "rationale": (
+            f"Covers {len(covered)} of {len(want)} areas of the work"
+            + (f" ({', '.join(c.lower() for c in covered[:3])})" if covered else "")
+            + f", in {'the same' if profile.sector == opp.sector else 'a different'} sector."
+        ),
+    }
 
 
 # ---------------------------------------------------------------- profile consistency

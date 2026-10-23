@@ -21,7 +21,7 @@ from ..auth import current_user, own_org_or_404, require_role
 from ..config import settings
 from ..db import get_db
 from ..engine.taxonomy import CAPABILITIES, COMPLIANCE_CATALOGUE, PROVINCES, SECTORS
-from ..llm import client, prompts
+from ..llm import client, local, prompts
 from ..schemas import Strict
 from ..services import doc_status, rematch_for_sme
 
@@ -39,6 +39,12 @@ RETENTION_YEARS = 5
 
 class ExpiryIn(Strict):
     expiry_date: date
+
+
+def _warm(org_id: uuid.UUID) -> None:
+    from .matches import warm_rationales  # imported here: matches reaches back into this module
+
+    warm_rationales(org_id)
 
 
 def _view(d: m.Document) -> dict:
@@ -159,6 +165,7 @@ async def upload(
     db.commit()
     rematch_for_sme(db, user.organisation_id)  # the new document counts straight away
     db.commit()
+    _warm(user.organisation_id)
     return {**_view(doc), "verification": result}
 
 
@@ -264,7 +271,13 @@ def read_with_ai(
         provinces=PROVINCES,
         codes=sorted(CAPABILITIES),
     )
-    got = client.call(prompt, prompts.DocumentExtraction, file=(path.read_bytes(), doc.mime_type))
+    local_mode = settings.llm_provider == "local"
+    data = path.read_bytes()
+    got = (
+        local.read_document(data, doc.mime_type)
+        if local_mode
+        else client.call(prompt, prompts.DocumentExtraction, file=(data, doc.mime_type))
+    )
     write_audit(
         db,
         user.id,
@@ -277,7 +290,7 @@ def read_with_ai(
     if got is None:
         return {"source": "unavailable", "draft": None, "checks": []}
     return {
-        "source": "ai",
+        "source": "local" if local_mode else "ai",
         "provider": settings.llm_provider,
         "draft": got.model_dump(mode="json"),
         "checks": extraction_checks(db, doc, got),
@@ -306,4 +319,5 @@ def set_expiry(
     db.commit()
     rematch_for_sme(db, user.organisation_id)
     db.commit()
+    _warm(user.organisation_id)
     return _view(doc)

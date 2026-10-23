@@ -330,7 +330,7 @@ export function VerificationCentre() {
 
 /* ------------------------------------------------------------------ documents */
 
-export function DocumentUpload({ tax, onDone }: { tax: Taxonomy; onDone: () => void }) {
+export function DocumentUpload({ tax, onDone, onUploaded }: { tax: Taxonomy; onDone: () => void; onUploaded?: (d: Doc) => void }) {
   const toast = useToast()
   const [type, setType] = useState('TCS')
   const [expiry, setExpiry] = useState('')
@@ -345,7 +345,7 @@ export function DocumentUpload({ tax, onDone }: { tax: Taxonomy; onDone: () => v
     try {
       const r = await api.upload(form)
       toast(r.verification === 'verified' ? 'Document uploaded and checked.' : `Uploaded. Check result: ${pretty(r.verification)}. A reviewer may follow up.`, r.verification === 'verified' ? 'success' : 'info')
-      setFile(null); setExpiry(''); onDone()
+      setFile(null); setExpiry(''); onDone(); onUploaded?.(r)
     } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
   }
   return (
@@ -367,6 +367,8 @@ export function Documents() {
   const docs = useLoad(() => api.documents())
   const tax = useLoad(() => api.taxonomy())
   const [reading, setReading] = useState<Doc | null>(null)
+  const [auto, setAuto] = useState(false)
+  const mode = useLoad(() => api.mode().catch(() => null))
   async function view(id: string) {
     try { window.open(URL.createObjectURL(await api.downloadDocument(id)), '_blank', 'noopener') }
     catch (err) { toast((err as Error).message, 'error') }
@@ -375,7 +377,7 @@ export function Documents() {
   return (
     <>
       <Welcome title="Documents" text="Files are security-sensitive evidence. Only your organisation and platform reviewers can open them, through an authenticated link." />
-      <Panel title="Upload a document"><DocumentUpload tax={tax.data} onDone={docs.reload} /></Panel>
+      <Panel title="Upload a document"><DocumentUpload tax={tax.data} onDone={docs.reload} onUploaded={(d) => { if (mode.data?.ai === 'local') { setAuto(true); setReading(d) } }} /></Panel>
       <Panel title="Document register" right={<Badge tone="blue">Authenticated access only</Badge>}>
         {docs.data?.length ? <div className="table-wrap"><table>
           <thead><tr><th>Type</th><th>Issuer</th><th>Status</th><th>Expiry</th><th>Uploaded</th><th /></tr></thead>
@@ -383,10 +385,10 @@ export function Documents() {
             <tr key={d.id}><td><b>{d.document_type}</b></td><td>{d.issuer}</td>
               <td><Badge tone={d.status === 'valid' ? 'green' : 'amber'}>{pretty(d.status)}</Badge></td>
               <td>{dateFmt(d.expiry_date)}</td><td>{dateFmt(d.uploaded_at)}</td>
-              <td>{d.has_file ? <div className="table-actions"><button className="btn btn-outline btn-small" onClick={() => view(d.id)}>View</button><button className="btn btn-outline btn-small" onClick={() => setReading(d)}>Read with AI</button></div> : <span className="hint">Seeded record</span>}</td></tr>))}</tbody>
+              <td>{d.has_file ? <div className="table-actions"><button className="btn btn-outline btn-small" onClick={() => view(d.id)}>View</button><button className="btn btn-outline btn-small" onClick={() => { setAuto(false); setReading(d) }}>{mode.data?.ai === 'local' ? 'Read it' : 'Read with AI'}</button></div> : <span className="hint">Seeded record</span>}</td></tr>))}</tbody>
         </table></div> : <div className="empty"><strong>No documents yet</strong>Upload a tax compliance PIN or B-BBEE affidavit to improve your readiness.</div>}
       </Panel>
-      {reading && <ReadWithAi doc={reading} onClose={() => setReading(null)} onChanged={docs.reload} />}
+      {reading && <ReadWithAi key={reading.id + String(auto)} doc={reading} auto={auto} onClose={() => setReading(null)} onChanged={docs.reload} />}
     </>
   )
 }

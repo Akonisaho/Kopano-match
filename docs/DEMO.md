@@ -8,7 +8,7 @@ from each side, then prove it is responsible.
 python seed.py --empty
 python -m uvicorn app.main:app --port 8000        # with your real Gemini and Brevo keys in backend/.env
 python scripts/build_demo.py --email you@yourdomain.co.za
-python scripts/make_demo_documents.py "Isizwe Civil Works"      # sample certificates in demo-documents/
+python scripts/make_demo_documents.py "Isizwe Civil Works"      # sample certificates in demo-documents/ (all expire 31 Dec 2027)
 ```
 Sign in once as each account and let the browser remember nothing. Open the phone with the passport
 link ready. Keep the in-app bell open: it works even if email is slow.
@@ -20,8 +20,8 @@ play once: the dot is blocked, two documents are named, then it glides to award 
 ## 0:20 to 1:20. Story one: the business (`demo+isizwe@…`)
 1. **Home:** "R4 200 000 is waiting for Isizwe, one step away." Point at the single number.
 2. **Unlock Plan:** tick the two documents. "Seven days, fourteen days, R0. The platform tells him exactly what to do."
-3. **Documents:** upload `COID.pdf`, then `CIDB.pdf` (both expiry 2027-09-18). The R4.2m needs both. Press **Read with AI** on one: Gemini reads the certificate,
-   checks it against the account, and he confirms. "AI drafts, he decides."
+3. **Documents:** choose the type, pick `COID.pdf`, press upload, then do the same with `CIDB.pdf`. You do not need to type a date. Each file is read on this computer in a blink, the expiry date is filled in from the document, and the checks run. The R4.2m needs both. The reader
+   checks it against the account. "It reads the paperwork, he stays in control."
 4. **Home again:** scores refresh the moment each file lands. After the second one the number drops and the business is award ready.
 5. **Passport:** create it, show the QR, open it on the phone. "One link he can give any buyer, even outside
    this platform. He controls it."

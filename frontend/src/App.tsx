@@ -16,6 +16,7 @@ import { Ecosystem } from './pages/Ecosystem'
 import { ProviderFeedback, SmeFeedback } from './pages/Feedback'
 import ResponsibleAI from './pages/ResponsibleAI'
 import PassportPage from './pages/PassportPage'
+import { PublicOpportunities, PublicOpportunity } from './pages/PublicOpps'
 
 function Index() {
   const { me } = useAuth()
@@ -39,6 +40,8 @@ export default function App() {
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/responsible-ai" element={<ResponsibleAI />} />
       <Route path="/passport/:token" element={<PassportPage />} />
+      <Route path="/opportunities" element={<PublicOpportunities />} />
+      <Route path="/opportunities/:id" element={<PublicOpportunity />} />
       <Route path="/reset" element={<ResetPassword />} />
       <Route path="/onboarding" element={<RequireRole roles={['sme']}><Onboarding /></RequireRole>} />
       <Route path="/app" element={<RequireRole roles={['sme', 'corporate', 'funder', 'support', 'admin']}><Shell /></RequireRole>}>

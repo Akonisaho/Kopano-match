@@ -18,6 +18,7 @@ from .routers import (
     opportunities,
     passport,
     providers,
+    public,
     smes,
 )
 
@@ -77,6 +78,7 @@ for r in (
     feedback,
     ingest,
     passport,
+    public,
 ):
     app.include_router(r.router)
 

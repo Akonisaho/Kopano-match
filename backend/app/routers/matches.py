@@ -1,4 +1,5 @@
 import json
+import threading
 import uuid
 from datetime import UTC, datetime
 
@@ -11,7 +12,8 @@ from .. import models as m
 from .. import notifications
 from ..audit import write_audit
 from ..auth import PROVIDER_ROLES, current_user, require_role
-from ..db import get_db
+from ..config import settings
+from ..db import SessionLocal, get_db
 from ..llm import client, prompts
 from ..routers.smes import verification_badges
 
@@ -47,6 +49,33 @@ def _rationale(match: m.Match, sme_name: str) -> tuple[str, str]:
     if text:
         return text, "llm"
     return prompts.fallback_rationale(sme_name, facts), "template"
+
+
+def warm_rationales(org_id: uuid.UUID) -> None:
+    """After a rescore, write the plain-words summary in the background so the next page view is
+    instant. Only with a live AI provider: otherwise the template is quick and nothing is needed."""
+    if not (settings.llm_provider == "gemini" and settings.gemini_api_key):
+        return
+
+    def run() -> None:
+        try:
+            with SessionLocal() as db:
+                for mt in db.scalars(select(m.Match).where(m.Match.sme_id == org_id)):
+                    if "rationale" in (mt.explanation or {}):
+                        continue
+                    org = db.get(m.Organisation, mt.sme_id)
+                    text, source = _rationale(mt, org.name)
+                    mt.explanation = {
+                        **mt.explanation,
+                        "rationale": text,
+                        "rationale_source": source,
+                    }
+                    flag_modified(mt, "explanation")
+                db.commit()
+        except Exception:  # noqa: BLE001 - a warm-up must never matter
+            pass
+
+    threading.Thread(target=run, daemon=True).start()
 
 
 @router.get("/{match_id}/dossier")

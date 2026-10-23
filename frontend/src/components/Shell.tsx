@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { isProvider, tokenSecondsLeft, type Role } from '../api'
 import { roleLabel, useAuth } from '../auth'
 import { Logo } from '../ui'
+import NotificationBell from './NotificationBell'
 
 type NavItem = [path: string, label: string, icon: string]
 
@@ -68,6 +69,7 @@ export default function Shell() {
         <header className="app-header">
           <h2>{title}</h2>
           <div className="header-actions">
+            <NotificationBell />
             <span className={`security-chip ${mins !== null && mins <= 5 ? 'warn' : ''}`} title="Access tokens expire after 30 minutes">
               Secure session · {roleLabel(me.role)}{mins !== null ? ` · ${mins} min left` : ''}
             </span>

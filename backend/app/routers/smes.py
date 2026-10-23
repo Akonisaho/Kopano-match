@@ -140,14 +140,8 @@ def dashboard(user: m.User = Depends(require_role("sme")), db: Session = Depends
         .where(m.Match.sme_id == user.organisation_id)
         .order_by(m.Match.overall_score.desc())
     ).all()
-    if (
-        not rows
-        and db.scalar(
-            select(m.SmeProfile.id).where(m.SmeProfile.organisation_id == user.organisation_id)
-        )
-        is None
-    ):
-        raise HTTPException(404, "Complete your profile first")
+    if not rows:
+        return {"readiness_score": None, "open_gaps": [], "matches": []}
     gaps: dict[str, dict] = {}
     matches = []
     for match, opp in rows:

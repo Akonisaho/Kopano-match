@@ -157,3 +157,11 @@ def audit_trail(
         }
         for a in rows
     ]
+
+
+@router.post("/reminders/run")
+def run_reminders(db: Session = Depends(get_db)):
+    """Send document expiry reminders now. Also runnable on a schedule: scripts/send_reminders.py."""
+    from .. import reminders
+
+    return reminders.run(db)

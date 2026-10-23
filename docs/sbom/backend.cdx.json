@@ -253,6 +253,54 @@
       "version": "4.2.0"
     },
     {
+      "bom-ref": "cffi==2.1.1",
+      "description": "Foreign Function Interface for Python calling C code.",
+      "externalReferences": [
+        {
+          "comment": "from packaging metadata Project-URL: Download",
+          "type": "distribution",
+          "url": "https://github.com/python-cffi/cffi/releases"
+        },
+        {
+          "comment": "from packaging metadata Project-URL: Documentation",
+          "type": "documentation",
+          "url": "https://cffi.readthedocs.io/"
+        },
+        {
+          "comment": "from packaging metadata Project-URL: Issue Tracker",
+          "type": "issue-tracker",
+          "url": "https://github.com/python-cffi/cffi/issues"
+        },
+        {
+          "comment": "from packaging metadata Project-URL: Source Code",
+          "type": "other",
+          "url": "https://github.com/python-cffi/cffi"
+        },
+        {
+          "comment": "from packaging metadata Project-URL: Contact",
+          "type": "other",
+          "url": "https://groups.google.com/forum/#!forum/python-cffi"
+        },
+        {
+          "comment": "from packaging metadata Project-URL: Changelog",
+          "type": "release-notes",
+          "url": "https://cffi.readthedocs.io/en/latest/whatsnew.html"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "acknowledgement": "declared",
+            "id": "MIT-0"
+          }
+        }
+      ],
+      "name": "cffi",
+      "purl": "pkg:pypi/cffi@2.1.1",
+      "type": "library",
+      "version": "2.1.1"
+    },
+    {
       "bom-ref": "click==8.5.0",
       "description": "Composable command line interface toolkit",
       "externalReferences": [
@@ -317,6 +365,47 @@
       "purl": "pkg:pypi/colorama@0.4.6",
       "type": "library",
       "version": "0.4.6"
+    },
+    {
+      "bom-ref": "cryptography==50.0.1",
+      "description": "cryptography is a package which provides cryptographic recipes and primitives to Python developers.",
+      "externalReferences": [
+        {
+          "comment": "from packaging metadata Project-URL: documentation",
+          "type": "documentation",
+          "url": "https://cryptography.io/"
+        },
+        {
+          "comment": "from packaging metadata Project-URL: issues",
+          "type": "issue-tracker",
+          "url": "https://github.com/pyca/cryptography/issues"
+        },
+        {
+          "comment": "from packaging metadata Project-URL: source",
+          "type": "other",
+          "url": "https://github.com/pyca/cryptography/"
+        },
+        {
+          "comment": "from packaging metadata Project-URL: changelog",
+          "type": "release-notes",
+          "url": "https://cryptography.io/en/latest/changelog/"
+        },
+        {
+          "comment": "from packaging metadata Project-URL: homepage",
+          "type": "website",
+          "url": "https://github.com/pyca/cryptography"
+        }
+      ],
+      "licenses": [
+        {
+          "acknowledgement": "declared",
+          "expression": "Apache-2.0 OR BSD-3-Clause"
+        }
+      ],
+      "name": "cryptography",
+      "purl": "pkg:pypi/cryptography@50.0.1",
+      "type": "library",
+      "version": "50.0.1"
     },
     {
       "bom-ref": "dnspython==2.9.0",
@@ -657,6 +746,29 @@
       "version": "2.9.9"
     },
     {
+      "bom-ref": "pycparser==3.12",
+      "description": "C parser in Python",
+      "externalReferences": [
+        {
+          "comment": "from packaging metadata Project-URL: Homepage",
+          "type": "website",
+          "url": "https://github.com/eliben/pycparser"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "acknowledgement": "declared",
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "pycparser",
+      "purl": "pkg:pypi/pycparser@3.12",
+      "type": "library",
+      "version": "3.12"
+    },
+    {
       "bom-ref": "pydantic==2.9.2",
       "description": "Data validation using Python type hints",
       "externalReferences": [
@@ -840,6 +952,44 @@
       "purl": "pkg:pypi/python-multipart@0.0.32",
       "type": "library",
       "version": "0.0.32"
+    },
+    {
+      "bom-ref": "segno==1.6.6",
+      "description": "QR Code and Micro QR Code generator for Python",
+      "externalReferences": [
+        {
+          "comment": "from packaging metadata Project-URL: Documentation",
+          "type": "documentation",
+          "url": "https://segno.readthedocs.io/"
+        },
+        {
+          "comment": "from packaging metadata Project-URL: Issue tracker",
+          "type": "issue-tracker",
+          "url": "https://github.com/heuer/segno/issues/"
+        },
+        {
+          "comment": "from packaging metadata Project-URL: Changes",
+          "type": "release-notes",
+          "url": "https://github.com/heuer/segno/blob/master/CHANGES.rst"
+        },
+        {
+          "comment": "from packaging metadata Project-URL: Homepage",
+          "type": "website",
+          "url": "https://github.com/heuer/segno/"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "acknowledgement": "declared",
+            "name": "License :: OSI Approved :: BSD License"
+          }
+        }
+      ],
+      "name": "segno",
+      "purl": "pkg:pypi/segno@1.6.6",
+      "type": "library",
+      "version": "1.6.6"
     },
     {
       "bom-ref": "starlette==1.9.0",
@@ -1109,6 +1259,7 @@
   "dependencies": [
     {
       "dependsOn": [
+        "cryptography==50.0.1",
         "typing_extensions==4.16.0"
       ],
       "ref": "PyJWT==2.15.1"
@@ -1141,6 +1292,12 @@
       "ref": "bcrypt==4.2.0"
     },
     {
+      "dependsOn": [
+        "pycparser==3.12"
+      ],
+      "ref": "cffi==2.1.1"
+    },
+    {
       "ref": "click==8.5.0"
     },
     {
@@ -1148,6 +1305,15 @@
     },
     {
       "dependsOn": [
+        "bcrypt==4.2.0",
+        "cffi==2.1.1",
+        "typing_extensions==4.16.0"
+      ],
+      "ref": "cryptography==50.0.1"
+    },
+    {
+      "dependsOn": [
+        "cryptography==50.0.1",
         "idna==3.20"
       ],
       "ref": "dnspython==2.9.0"
@@ -1200,6 +1366,9 @@
       "ref": "psycopg2-binary==2.9.9"
     },
     {
+      "ref": "pycparser==3.12"
+    },
+    {
       "dependsOn": [
         "PyYAML==6.0.3",
         "pydantic==2.9.2",
@@ -1230,6 +1399,9 @@
     },
     {
       "ref": "python-multipart==0.0.32"
+    },
+    {
+      "ref": "segno==1.6.6"
     },
     {
       "dependsOn": [
@@ -1275,7 +1447,7 @@
     }
   ],
   "metadata": {
-    "timestamp": "2026-10-23T16:07:31.579330+00:00",
+    "timestamp": "2026-10-23T18:33:13.609338+00:00",
     "tools": {
       "components": [
         {
@@ -1379,7 +1551,7 @@
       ]
     }
   },
-  "serialNumber": "urn:uuid:98489374-7287-4eba-b5d5-fda5fd9f5920",
+  "serialNumber": "urn:uuid:f50f9340-30c2-4d39-9be8-4f3c7560a2ba",
   "version": 1,
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",

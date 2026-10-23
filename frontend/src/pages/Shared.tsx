@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, dateFmt, isProvider, pretty, QUADRANT_COLOR, zar } from '../api'
 import { useAuth } from '../auth'
+import TwoStep from '../components/TwoStep'
 import { useLoad } from '../hooks'
 import { TRUST } from '../trust'
 import {
@@ -106,6 +107,7 @@ export function SecurityCentre() {
           <div className="security-card" key={c.t}><Badge tone={c.ok ? 'green' : 'amber'}>{c.ok ? 'In place' : 'Roadmap'}</Badge><h4>{c.t}</h4><p>{c.d}</p></div>))}
       </div>
       <div className="grid-2">
+        <TwoStep />
         <Panel title="Your recent activity" sub="Recorded in a log the application cannot edit or delete." right={<Badge tone="blue">Traceable</Badge>}>
           {audit.data?.length ? <div className="table-wrap"><table>
             <thead><tr><th>When</th><th>Action</th><th>Record</th></tr></thead>

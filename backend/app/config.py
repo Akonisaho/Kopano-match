@@ -8,13 +8,14 @@ MIN_JWT_SECRET_BYTES = 32
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", env_ignore_empty=True)
 
     # The app connects as kopano_app (no UPDATE/DELETE on audit). seed.py uses the admin URL.
     database_url: str = "postgresql+psycopg2://kopano_app:kopano_app_dev@localhost:55432/kopano"
     admin_database_url: str = "postgresql+psycopg2://postgres:postgres@localhost:55432/kopano"
 
     environment: str = "dev"
+    mfa_encryption_key: str = ""  # a Fernet key; required outside dev
     jwt_secret: str = DEV_JWT_SECRET
     jwt_expire_minutes: int = 30
     upload_dir: Path = Path("uploads")

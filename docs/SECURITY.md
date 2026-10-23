@@ -98,3 +98,20 @@ and build provenance attestation; container image scanning (there is no image ye
 | Gemini (summaries, drafting) | Figures from a match, or text the user pastes | Names and identifiers in match summaries | Operator agreement; decide what users may paste |
 
 A failed send or a failed model call never fails a request. Both providers sit behind adapters.
+
+## Two-step sign-in, password reset, notifications
+
+| Control | Where | Proven by |
+|---|---|---|
+| Optional authenticator-app sign-in (TOTP). The secret is encrypted at rest with an application key; a code cannot be used twice; recovery codes are stored hashed and work once | `app/mfa.py`, `routers/auth.py` | `test_two_step_sign_in_end_to_end` |
+| The half-finished sign-in token is useless as an access token | `app/auth.py` | the same test (stolen challenge token returns 401) |
+| Attempts at the second step are throttled per account | `routers/auth.py` | login throttle tests |
+| Password reset: single-use link, 30 minutes, only a hash stored, every outstanding link dies on use, same answer whether or not the email exists | `routers/auth.py` | `test_password_reset_is_single_use_expires_and_does_not_reveal_accounts` |
+| In-app notifications are private to the recipient, and erasure removes them | `routers/notifications.py` | `test_in_app_notifications_work_without_any_email_provider` |
+| Document expiry reminders are sent once per stage, recorded in the audit log | `app/reminders.py` | `test_expiry_reminders_go_out_once_and_only_once` |
+
+Honest limits: two-step sign-in is optional and not required for any role yet. The password-reset
+endpoint does slightly more work for a registered email than an unknown one, so a patient attacker
+could measure a timing difference; the response itself is identical. Existing access tokens stay
+valid until they expire (30 minutes) after a password reset. Outside development the app refuses
+to start without `MFA_ENCRYPTION_KEY`.

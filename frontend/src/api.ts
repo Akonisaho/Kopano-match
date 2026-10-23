@@ -59,12 +59,22 @@ const json = (method: string, body?: unknown): RequestInit => ({
 
 export const api = {
   login: (email: string, password: string) =>
-    request<{ access_token: string; role: Role }>('/auth/login', {
+    request<LoginResult>('/auth/login', {
       method: 'POST',
       body: new URLSearchParams({ username: email, password }),
     }),
   register: (b: unknown) => request<{ access_token: string; role: Role }>('/auth/register', json('POST', b)),
   me: () => request<Me>('/me'),
+  mfaVerify: (mfa_token: string, code: string) =>
+    request<{ access_token: string; role: Role }>('/auth/mfa/verify', json('POST', { mfa_token, code })),
+  mfaSetup: () => request<MfaSetup>('/auth/mfa/setup', json('POST')),
+  mfaEnable: (code: string) => request<{ recovery_codes: string[] }>('/auth/mfa/enable', json('POST', { code })),
+  mfaDisable: (code: string) => request<{ status: string }>('/auth/mfa/disable', json('POST', { code })),
+  forgot: (email: string) => request<{ status: string }>('/auth/forgot', json('POST', { email })),
+  reset: (token: string, new_password: string) =>
+    request<{ status: string }>('/auth/reset', json('POST', { token, new_password })),
+  notifications: () => request<NotificationBox>('/notifications'),
+  markNotificationsRead: () => request<{ status: string }>('/notifications/read', json('POST')),
   myData: () => request<unknown>('/me/data'),
   myAudit: () => request<{ action: string; entity_type: string; timestamp: string }[]>('/me/audit'),
   deleteMe: () => request<unknown>('/me/delete', json('POST')),
@@ -114,12 +124,20 @@ export const api = {
     request<unknown>(`/admin/matches/${id}/review`, json('POST', { decision })),
 }
 
+export interface LoginResult {
+  access_token?: string; role?: Role; mfa_required?: boolean; mfa_token?: string
+}
+export interface MfaSetup { secret: string; otpauth_uri: string; qr: string }
+export interface NotificationBox {
+  unread: number
+  items: { id: string; title: string; body: string; link: string | null; created_at: string; read: boolean }[]
+}
 export type Role = 'sme' | 'corporate' | 'funder' | 'support' | 'admin'
 export type Quadrant = 'award_now' | 'coachable' | 'ready_weak_fit' | 'develop'
 export type Kind = 'procurement' | 'grant' | 'funding' | 'investor' | 'support'
 
 export interface Me {
-  id: string; email: string; full_name: string; role: Role
+  id: string; email: string; full_name: string; role: Role; mfa_enabled: boolean
   organisation: { id: string; name: string; verification_status: string } | null
 }
 export interface Taxonomy {

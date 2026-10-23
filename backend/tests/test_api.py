@@ -545,3 +545,138 @@ def test_a_failing_email_provider_never_breaks_the_request(monkeypatch):
     monkeypatch.setattr(notifications, "email_sender", lambda: Broken())
     h = register("sme")  # welcome email fails silently
     assert client.get("/me", headers=h).status_code == 200
+
+
+# ---- notification bell, reminders, password reset, two-step sign-in ----
+
+
+def _email_link(to: str, contains: str) -> str:
+    import re
+
+    from app.adapters.email import OUTBOX
+
+    mail = [e for e in OUTBOX if e["to"] == to and contains in e["subject"]][-1]
+    return re.search(r'href="([^"]+)"', mail["html"]).group(1)
+
+
+def test_in_app_notifications_work_without_any_email_provider():
+    corp = login("corporate@kopano.demo")
+    opp = opp_id(corp, "Provincial roads rehabilitation")
+    ranked = client.get(f"/opportunities/{opp}/matches", headers=corp).json()
+    mid = next(r["match_id"] for r in ranked if r["sme_name"] == "Lerato Civil & Electrical")
+    client.post(f"/matches/{mid}/shortlist", headers=corp)
+    sme = login("sme-006@sme.demo")
+    box = client.get("/notifications", headers=sme).json()
+    assert box["unread"] >= 1 and any("shortlisted" in n["title"] for n in box["items"])
+    assert client.post("/notifications/read", headers=sme).status_code == 200
+    assert client.get("/notifications", headers=sme).json()["unread"] == 0
+    # Someone else's bell is empty of this notice
+    other = client.get("/notifications", headers=login("sme-005@sme.demo")).json()
+    assert not any("Lerato" in n["body"] for n in other["items"])
+
+
+def test_expiry_reminders_go_out_once_and_only_once():
+    admin = login("admin@kopano.demo")
+    first = client.post("/admin/reminders/run", headers=admin)
+    assert first.status_code == 200
+    second = client.post("/admin/reminders/run", headers=admin).json()
+    assert second == {"notices_sent": 0, "documents": 0}
+    assert client.post("/admin/reminders/run", headers=login("sme-001@sme.demo")).status_code == 403
+
+
+def test_password_reset_is_single_use_expires_and_does_not_reveal_accounts():
+    from app.adapters.email import OUTBOX
+
+    h = register("sme")
+    email = client.get("/me", headers=h).json()["email"]
+    OUTBOX.clear()
+    a = client.post("/auth/forgot", json={"email": email})
+    b = client.post("/auth/forgot", json={"email": f"{uuid.uuid4().hex[:8]}@nobody.example"})
+    assert a.status_code == b.status_code == 202 and a.json() == b.json()
+    assert len([e for e in OUTBOX if "Reset" in e["subject"]]) == 1  # unknown email: nothing sent
+    token = _email_link(email, "Reset").split("token=")[1]
+    new = "a-brand-new-password-1"
+    assert client.post("/auth/reset", json={"token": token, "new_password": new}).status_code == 200
+    assert client.post("/auth/login", data={"username": email, "password": new}).status_code == 200
+    assert (
+        client.post(
+            "/auth/login", data={"username": email, "password": "a-long-test-password"}
+        ).status_code
+        == 401
+    )
+    again = client.post("/auth/reset", json={"token": token, "new_password": "another-password-22"})
+    assert again.status_code == 400  # single use
+    bogus = client.post("/auth/reset", json={"token": "x" * 40, "new_password": new})
+    assert bogus.status_code == 400
+    weak = client.post("/auth/reset", json={"token": token, "new_password": "short"})
+    assert weak.status_code == 422
+
+
+def test_two_step_sign_in_end_to_end():
+    import time
+
+    from sqlalchemy import text
+
+    from app import mfa
+
+    h = register("sme")
+    me = client.get("/me", headers=h).json()
+    email = me["email"]
+    setup = client.post("/auth/mfa/setup", headers=h).json()
+    secret = setup["secret"]
+    assert setup["qr"].startswith("data:image/svg+xml") and "otpauth://" in setup["otpauth_uri"]
+    # The secret is encrypted at rest, never stored as given
+    with engine.connect() as conn:
+        stored = conn.execute(
+            text("SELECT totp_secret_enc FROM core.users WHERE id = :i"), {"i": me["id"]}
+        ).scalar_one()
+    assert stored and secret not in stored
+    wrong = client.post("/auth/mfa/enable", headers=h, json={"code": "000000"})
+    assert wrong.status_code == 400
+    now = time.time()
+    on = client.post("/auth/mfa/enable", headers=h, json={"code": mfa.totp(secret, now)})
+    assert on.status_code == 200
+    recovery = on.json()["recovery_codes"]
+    assert len(recovery) == 8 and client.get("/me", headers=h).json()["mfa_enabled"] is True
+
+    # Password alone no longer signs you in
+    step1 = client.post("/auth/login", data={"username": email, "password": "a-long-test-password"})
+    body = step1.json()
+    assert step1.status_code == 200 and body["mfa_required"] and "access_token" not in body
+    # The half-finished token is useless as an access token
+    stolen = {"Authorization": f"Bearer {body['mfa_token']}"}
+    assert client.get("/me", headers=stolen).status_code == 401
+    bad = client.post("/auth/mfa/verify", json={"mfa_token": body["mfa_token"], "code": "111111"})
+    assert bad.status_code == 401
+    # The code used to enable cannot be replayed; the next one works
+    replay = client.post(
+        "/auth/mfa/verify", json={"mfa_token": body["mfa_token"], "code": mfa.totp(secret, now)}
+    )
+    assert replay.status_code == 401
+    ok = client.post(
+        "/auth/mfa/verify",
+        json={"mfa_token": body["mfa_token"], "code": mfa.totp(secret, now + 30)},
+    )
+    assert ok.status_code == 200 and ok.json()["access_token"]
+    # A recovery code works once
+    s2 = client.post(
+        "/auth/login", data={"username": email, "password": "a-long-test-password"}
+    ).json()
+    r1 = client.post("/auth/mfa/verify", json={"mfa_token": s2["mfa_token"], "code": recovery[0]})
+    assert r1.status_code == 200
+    s3 = client.post(
+        "/auth/login", data={"username": email, "password": "a-long-test-password"}
+    ).json()
+    r2 = client.post("/auth/mfa/verify", json={"mfa_token": s3["mfa_token"], "code": recovery[0]})
+    assert r2.status_code == 401
+    # Switching it off needs a valid code and then restores plain sign-in
+    token = {"Authorization": f"Bearer {ok.json()['access_token']}"}
+    assert (
+        client.post("/auth/mfa/disable", headers=token, json={"code": "123456"}).status_code == 400
+    )
+    assert (
+        client.post("/auth/mfa/disable", headers=token, json={"code": recovery[1]}).status_code
+        == 200
+    )
+    plain = client.post("/auth/login", data={"username": email, "password": "a-long-test-password"})
+    assert "access_token" in plain.json()

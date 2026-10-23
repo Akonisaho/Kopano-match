@@ -1,10 +1,11 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, zar, type Role, type Showcase } from '../api'
 import { homeFor, useAuth } from '../auth'
 import QuadrantChart from '../components/QuadrantChart'
 import { TRUST } from '../trust'
-import { Badge, ErrorNote, Logo, Modal, useToast } from '../ui'
+import AuthModal from '../components/AuthModal'
+import { Badge, Logo } from '../ui'
 
 const ROLES: { key: Exclude<Role, 'admin'>; label: string; desc: string; points: string[] }[] = [
   { key: 'sme', label: 'SME', desc: 'Build a verified capability profile, see exactly what stands between you and each opportunity, and apply.',
@@ -17,11 +18,6 @@ const ROLES: { key: Exclude<Role, 'admin'>; label: string; desc: string; points:
     points: ['Match on readiness, not just size', 'See common bottlenecks', 'Track who applied and why'] },
 ]
 
-const DEMO = [
-  ['SME (coachable)', 'sme-001@sme.demo'], ['SME (overtrading flag)', 'sme-003@sme.demo'],
-  ['Corporate', 'corporate@kopano.demo'], ['Funder', 'funder@kopano.demo'],
-  ['Business support', 'support@kopano.demo'], ['Platform reviewer', 'admin@kopano.demo'],
-]
 
 export default function Landing({ initialAuth }: { initialAuth?: 'login' | 'signup' }) {
   const [auth, setAuth] = useState<'login' | 'signup' | null>(initialAuth ?? null)
@@ -187,7 +183,7 @@ export default function Landing({ initialAuth }: { initialAuth?: 'login' | 'sign
         <span><a href="/privacy">Privacy notice</a></span>
       </footer>
 
-      {auth && <AuthModal mode={auth} role={role} setMode={setAuth} setRole={setRole} onClose={() => { setAuth(null); if (window.location.pathname !== '/') nav('/') }} />}
+      {auth && <AuthModal mode={auth} role={role} roles={ROLES} setMode={setAuth} setRole={setRole} onClose={() => { setAuth(null); if (window.location.pathname !== '/') nav('/') }} />}
     </>
   )
 }
@@ -197,87 +193,5 @@ function Ring({ v, label, color }: { v: number; label: string; color: string }) 
     <div className="score-ring" style={{ ['--v' as string]: v, ['--c' as string]: color, width: 84, height: 84 }}>
       <b style={{ fontSize: 20 }}>{Math.round(v)}<small>{label}</small></b>
     </div>
-  )
-}
-
-function AuthModal({ mode, role, setMode, setRole, onClose }: {
-  mode: 'login' | 'signup'; role: Exclude<Role, 'admin'>
-  setMode: (m: 'login' | 'signup') => void; setRole: (r: Exclude<Role, 'admin'>) => void; onClose: () => void
-}) {
-  const { signIn } = useAuth()
-  const nav = useNavigate()
-  const toast = useToast()
-  const [f, setF] = useState({ full_name: '', organisation_name: '', email: '', phone: '', password: '', registration_number: '' })
-  const [consent, setConsent] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
-
-  async function submit(e: FormEvent) {
-    e.preventDefault(); setError(null); setBusy(true)
-    try {
-      const { access_token } = mode === 'login'
-        ? await api.login(f.email, f.password)
-        : await api.register({ ...f, role, consent, phone: f.phone || null, registration_number: f.registration_number || null })
-      const m = await signIn(access_token)
-      onClose()
-      toast(mode === 'login' ? 'Welcome back.' : 'Account created.')
-      nav(homeFor(m.role))
-    } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
-  }
-
-  return (
-    <Modal onClose={onClose}>
-      <div className="auth-layout">
-        <div className="auth-brand">
-          <Logo dark />
-          <h2>Join a trusted opportunity ecosystem.</h2>
-          <p>Verified profiles. Real opportunities. Explainable matching. Human-reviewed trust decisions.</p>
-          <div className="auth-benefits">
-            <span><i />Fit and readiness, never one opaque score</span><span><i />Costed, dated plans to close every gap</span>
-            <span><i />Identity images are never stored</span><span><i />An audit trail the app cannot rewrite</span>
-          </div>
-        </div>
-        <div className="auth-form">
-          <div className="auth-tabs">
-            <button className={mode === 'signup' ? 'active' : ''} onClick={() => setMode('signup')}>Create account</button>
-            <button className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>Log in</button>
-          </div>
-          <form onSubmit={submit}>
-            {mode === 'signup' ? <>
-              <h3 className="form-title">Create your account</h3>
-              <p className="form-sub">Choose your role first. Your workspace is tailored to it.</p>
-              <div className="field"><span className="lbl">I am joining as</span>
-                <div className="role-grid">{ROLES.map((r) => (
-                  <button type="button" key={r.key} className={`role-option ${role === r.key ? 'active' : ''}`} onClick={() => setRole(r.key)}><b>{r.label}</b><span>{r.desc.split('.')[0]}.</span></button>))}</div></div>
-              <ErrorNote error={error} />
-              <div className="form-grid">
-                <div className="field"><label htmlFor="n">Full name</label><input id="n" required value={f.full_name} onChange={set('full_name')} /></div>
-                <div className="field"><label htmlFor="o">Organisation</label><input id="o" required value={f.organisation_name} onChange={set('organisation_name')} /></div>
-              </div>
-              <div className="field"><label htmlFor="e">Email address</label><input id="e" type="email" required autoComplete="username" value={f.email} onChange={set('email')} placeholder="you@company.co.za" /></div>
-              <div className="form-grid">
-                <div className="field"><label htmlFor="r">Registration number</label><input id="r" value={f.registration_number} onChange={set('registration_number')} placeholder="2018/123456/07" />
-                  <span className="hint">Checked against a registry adapter (simulated in this pilot).</span></div>
-                <div className="field"><label htmlFor="p">Password</label><input id="p" type="password" required minLength={12} autoComplete="new-password" value={f.password} onChange={set('password')} placeholder="Minimum 12 characters" /></div>
-              </div>
-              <label className="check-row"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-                <span>I have read the <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: 'var(--purple)' }}>privacy notice</a> and consent to my information being processed as described.</span></label>
-              <button className="btn btn-primary btn-full" disabled={!consent || busy}>{busy ? 'Creating…' : 'Create account'}</button>
-              <p className="hint" style={{ marginTop: 12 }}>Platform reviewer accounts are invite-only.</p>
-            </> : <>
-              <h3 className="form-title">Welcome back</h3>
-              <p className="form-sub">Log in to your Kopano Match workspace.</p>
-              <ErrorNote error={error} />
-              <div className="field"><label htmlFor="le">Email address</label><input id="le" type="email" required autoComplete="username" value={f.email} onChange={set('email')} /></div>
-              <div className="field"><label htmlFor="lp">Password</label><input id="lp" type="password" required autoComplete="current-password" value={f.password} onChange={set('password')} /></div>
-              <button className="btn btn-primary btn-full" disabled={busy}>{busy ? 'Signing in…' : 'Log in'}</button>
-              <div className="callout blue"><b>Demo accounts</b> (password <code>Demo-Password-1!</code>). Click one to fill the email:
-                <div className="chips">{DEMO.map(([l, e]) => <button type="button" key={e} className="chip" onClick={() => setF({ ...f, email: e, password: 'Demo-Password-1!' })}>{l}</button>)}</div></div>
-            </>}
-          </form>
-        </div>
-      </div>
-    </Modal>
   )
 }

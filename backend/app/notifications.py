@@ -1,7 +1,8 @@
-"""Service emails: a welcome, a shortlist notice, an application notice.
+"""Service notices: an in-app notification plus an email, for the people an event concerns.
 
-Each one goes to the people the event concerns and carries no scores, documents or personal
-details beyond the names already known to the recipient. A failed send never fails the request.
+The in-app copy is stored so it shows in the bell even with no email provider (and offline). The
+email goes through the configured provider. Neither carries scores or documents. A failed send
+never fails the request.
 """
 
 import html
@@ -18,18 +19,19 @@ from .config import settings
 log = logging.getLogger("kopano.notifications")
 
 
-def _page(heading: str, paragraphs: list[str], cta: str, path: str) -> str:
+def page(heading: str, paragraphs: list[str], cta: str, link: str) -> str:
     body = "".join(
         f'<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#344054">{html.escape(p)}</p>'
         for p in paragraphs
     )
+    href = html.escape(link if link.startswith("http") else settings.app_url.rstrip("/") + link)
     return (
         '<div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">'
         '<div style="font-weight:800;font-size:18px;color:#1d1060;margin-bottom:18px">Kopano Match</div>'
         f'<h1 style="font-size:20px;color:#12213b;margin:0 0 14px">{html.escape(heading)}</h1>{body}'
-        f'<a href="{html.escape(settings.app_url.rstrip("/") + path)}" '
-        'style="display:inline-block;background:#7c3aed;color:#fff;text-decoration:none;'
-        f'padding:11px 18px;border-radius:10px;font-weight:700;font-size:14px">{html.escape(cta)}</a>'
+        f'<a href="{href}" style="display:inline-block;background:#7c3aed;color:#fff;'
+        "text-decoration:none;padding:11px 18px;border-radius:10px;font-weight:700;font-size:14px"
+        f'">{html.escape(cta)}</a>'
         '<p style="margin-top:28px;font-size:12px;color:#8590a3">You are receiving this service '
         "message because of activity on your Kopano Match account. This is a pilot; verification "
         "sources shown in the app are labelled where they are simulated.</p></div>"
@@ -51,7 +53,13 @@ def send(to_email: str, to_name: str, subject: str, html_body: str) -> None:
         run()
 
 
-def _users_of(db: Session, org_id) -> list[m.User]:
+def notify(db: Session, user: m.User, subject: str, lines: list[str], cta: str, path: str) -> None:
+    """Store the in-app notice and send the email. The caller commits."""
+    db.add(m.Notification(user_id=user.id, title=subject, body=" ".join(lines), link=path))
+    send(user.email, user.full_name, subject, page(subject, lines, cta, path))
+
+
+def users_of(db: Session, org_id) -> list[m.User]:
     return list(
         db.scalars(
             select(m.User).where(m.User.organisation_id == org_id, m.User.deleted_at.is_(None))
@@ -59,19 +67,22 @@ def _users_of(db: Session, org_id) -> list[m.User]:
     )
 
 
-def welcome(user: m.User) -> None:
+def welcome(db: Session, user: m.User) -> None:
     first = user.full_name.split()[0]
     nxt = (
         "Next, complete your business profile so we can match you."
         if user.role == "sme"
         else "Next, publish an opportunity and we will rank matching SMEs for you."
     )
-    send(
-        user.email,
-        user.full_name,
+    notify(
+        db,
+        user,
         "Welcome to Kopano Match",
-        _page(f"Welcome, {first}", ["Your account is ready.", nxt], "Open Kopano Match", "/app"),
+        [f"Welcome, {first}. Your account is ready.", nxt],
+        "Open Kopano Match",
+        "/app",
     )
+    db.commit()
 
 
 def match_decided(db: Session, match: m.Match, new_status: str) -> None:
@@ -91,14 +102,10 @@ def match_decided(db: Session, match: m.Match, new_status: str) -> None:
             "You can see your position and the gaps on other opportunities in your dashboard.",
         ]
     else:
-        return  # a decision on a business that never applied is not worth an email
-    for u in _users_of(db, match.sme_id):
-        send(
-            u.email,
-            u.full_name,
-            subject,
-            _page(subject, lines, "View the match", f"/app/matches/{match.id}"),
-        )
+        return  # a decision on a business that never applied is not worth a notice
+    for u in users_of(db, match.sme_id):
+        notify(db, u, subject, lines, "View the match", f"/app/matches/{match.id}")
+    db.commit()
 
 
 def application_received(db: Session, match: m.Match) -> None:
@@ -109,10 +116,6 @@ def application_received(db: Session, match: m.Match) -> None:
         f"{sme.name} has applied to {opp.title}.",
         "Open the match to review the full breakdown.",
     ]
-    for u in _users_of(db, opp.organisation_id):
-        send(
-            u.email,
-            u.full_name,
-            subject,
-            _page(subject, lines, "Review the match", f"/app/matches/{match.id}"),
-        )
+    for u in users_of(db, opp.organisation_id):
+        notify(db, u, subject, lines, "Review the match", f"/app/matches/{match.id}")
+    db.commit()

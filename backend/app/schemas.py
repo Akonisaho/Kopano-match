@@ -148,3 +148,21 @@ class ExtractIn(Strict):
 
 
 __all__ = ["READINESS_TYPES"]
+
+
+class ForgotIn(Strict):
+    email: EmailStr
+
+
+class ResetIn(Strict):
+    token: str = Field(min_length=20, max_length=200)
+    new_password: str = Field(min_length=12, max_length=128)
+
+
+class MfaCodeIn(Strict):
+    code: str = Field(min_length=6, max_length=20)
+
+
+class MfaVerifyIn(Strict):
+    mfa_token: str = Field(min_length=20, max_length=1000)
+    code: str = Field(min_length=6, max_length=20)

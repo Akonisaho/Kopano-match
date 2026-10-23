@@ -7,6 +7,7 @@ operator of personal information, so an operator agreement is needed before real
 
 import json
 import logging
+import re
 import urllib.request
 from abc import ABC, abstractmethod
 
@@ -27,7 +28,8 @@ class EmailSender(ABC):
 class LogEmailSender(EmailSender):
     def send(self, to_email: str, to_name: str, subject: str, html: str) -> None:
         OUTBOX.append({"to": to_email, "name": to_name, "subject": subject, "html": html})
-        log.info("email (log mode) subject=%r", subject)
+        links = re.findall(r'href="([^"]+)"', html) if settings.environment == "dev" else []
+        log.info("email (log mode) to=%s subject=%r links=%s", to_email, subject, links)
 
 
 class BrevoEmailSender(EmailSender):

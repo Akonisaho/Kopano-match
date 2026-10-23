@@ -458,7 +458,7 @@ export function Applications() {
 
 export function Onboarding() {
   const nav = useNavigate()
-  const { me } = useAuth()
+  const { me, signOut } = useAuth()
   const prof = useLoad(() => api.profile())
   const tax = useLoad(() => api.taxonomy())
   const docs = useLoad(() => api.documents())
@@ -469,7 +469,7 @@ export function Onboarding() {
   const canNext = step === 2 ? !!p.profile : true
   return (
     <div className="onboard-wrap"><div className="onboard-card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><Logo /><Badge tone="purple">Step {step} of 4</Badge></div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><Logo /><div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><Badge tone="purple">Step {step} of 4</Badge><button className="btn btn-ghost btn-small" onClick={() => { signOut(); nav('/') }}>Sign out</button></div></div>
       <div className="stepper">{[1, 2, 3, 4].map((i) => <i key={i} className={i < step ? 'done' : i === step ? 'active' : ''} />)}</div>
       {step === 1 && <>
         <h2 className="form-title">Welcome, {me?.full_name.split(' ')[0]}</h2>

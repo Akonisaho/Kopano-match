@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,6 +11,7 @@ from .routers import (
     documents,
     matches,
     meta,
+    notifications,
     opportunities,
     providers,
     smes,
@@ -20,6 +23,16 @@ if settings.environment != "dev" and (
     raise RuntimeError(
         f"JWT_SECRET must be set to {MIN_JWT_SECRET_BYTES}+ random bytes outside dev"
     )
+
+if settings.environment != "dev" and not settings.mfa_encryption_key:
+    raise RuntimeError("MFA_ENCRYPTION_KEY must be set outside dev")
+
+_kopano_log = logging.getLogger("kopano")
+if not _kopano_log.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s:     %(message)s"))
+    _kopano_log.addHandler(_handler)
+    _kopano_log.setLevel(logging.INFO)
 
 app = FastAPI(title="Kopano Match API", version="0.1.0")
 
@@ -42,7 +55,18 @@ async def security_headers(request: Request, call_next):
     return response
 
 
-for r in (auth, smes, documents, opportunities, matches, applications, providers, admin, meta):
+for r in (
+    auth,
+    smes,
+    documents,
+    opportunities,
+    matches,
+    applications,
+    providers,
+    admin,
+    meta,
+    notifications,
+):
     app.include_router(r.router)
 
 

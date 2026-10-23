@@ -30,6 +30,11 @@ If you are on a work laptop, check that your employer is fine with this code on 
 
 ## 3. Clone and run
 
+Fastest path: after cloning, run `.\scripts\dev.ps1` (planted data) or `.\scripts\dev.ps1 -Empty`
+from the repository root. It does everything below. The full guide is `docs/SETUP.md`.
+
+Step by step:
+
 ```powershell
 git clone https://github.com/Akonisaho/Kopano-match.git
 cd Kopano-match

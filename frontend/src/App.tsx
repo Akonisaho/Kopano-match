@@ -4,6 +4,7 @@ import Shell from './components/Shell'
 import { isProvider } from './api'
 import Landing from './pages/Landing'
 import Privacy from './pages/Privacy'
+import ResetPassword from './pages/ResetPassword'
 import { MatchDetail, SecurityCentre } from './pages/Shared'
 import { Applications, Documents, Onboarding, SmeOpportunities, SmeOverview, SmeProfilePage, VerificationCentre } from './pages/Sme'
 import { OpportunityDetail, PostOpportunity, ProviderOverview, ShortlistPage, SmeDirectory } from './pages/Provider'
@@ -25,6 +26,7 @@ export default function App() {
       <Route path="/login" element={<Landing initialAuth="login" />} />
       <Route path="/register" element={<Landing initialAuth="signup" />} />
       <Route path="/privacy" element={<Privacy />} />
+      <Route path="/reset" element={<ResetPassword />} />
       <Route path="/onboarding" element={<RequireRole roles={['sme']}><Onboarding /></RequireRole>} />
       <Route path="/app" element={<RequireRole roles={['sme', 'corporate', 'funder', 'support', 'admin']}><Shell /></RequireRole>}>
         <Route index element={<Index />} />

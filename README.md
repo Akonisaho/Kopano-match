@@ -6,6 +6,11 @@ dated remediation plans, capacity-risk flags and consortium assembly. Pilot buil
 
 ## Run it
 
+Fastest: `.\scripts\dev.ps1 -Empty`, then `python scripts/build_demo.py --email you@gmail.com` from `backend/`.
+Step by step: [docs/SETUP.md](docs/SETUP.md). Keys and email: [docs/KEYS_AND_EMAIL.md](docs/KEYS_AND_EMAIL.md).
+
+Manually:
+
 ```bash
 docker compose up -d                 # PostgreSQL 16 on localhost:55432
 cd backend

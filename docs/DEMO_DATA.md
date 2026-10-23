@@ -1,5 +1,9 @@
 # Build your own demo data
 
+**Fastest:** `python scripts/build_demo.py --email you@gmail.com` from `backend/` builds everything
+below for you, through the real sign-up, upload and matching code (see [SETUP.md](SETUP.md)). The
+rest of this page is the same storyline done by hand.
+
 A demo that you created through the app looks real because it is real: every record went through
 sign-up, the registry and tax checks, the upload checks and the matching engine. Allow 30 minutes.
 
@@ -22,6 +26,7 @@ separate database, so keep them apart: run local tests with
 ## 2. Make sample documents
 
 ```powershell
+cd backend
 python scripts/make_demo_documents.py "Masego Infrastructure" "Thabo Civils" "Nomsa Builders" "Sizwe Road Works" "Tumelo Roadworks"
 ```
 

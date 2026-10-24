@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export const homeFor = (role: Role) => (role === 'admin' ? '/app/ecosystem' : '/app')
 export const roleLabel = (r: Role) =>
-  ({ sme: 'SME', corporate: 'Corporate buyer', funder: 'Funder / investor', support: 'Business support', admin: 'Platform reviewer' })[r]
+  ({ sme: 'SME', corporate: 'Corporate', funder: 'Funder / investor', support: 'Business support', admin: 'Platform reviewer' })[r]
 
 /** UI gate only. The API enforces the same rules, so this is convenience, not security. */
 export function RequireRole({ roles, children }: { roles: Role[] | 'provider'; children: ReactNode }) {

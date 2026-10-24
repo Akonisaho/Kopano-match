@@ -75,7 +75,67 @@ class Organisation(Base):
     org_type: Mapped[str] = mapped_column(String(20))  # sme, corporate, funder
     registration_number: Mapped[str | None] = mapped_column(String(40), unique=True)
     verification_status: Mapped[str] = mapped_column(String(20), default="pending")
+    # clear, monitoring, flagged, under_review, restricted, suspended, blacklisted, reinstated.
+    # Suspended and blacklisted are a hard gate: no matching, no applying, no posting.
+    enforcement_status: Mapped[str] = mapped_column(
+        String(14), default="clear", server_default="clear"
+    )
+    restrictions: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), default=list, server_default=text("'{}'")
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
+
+
+class EnforcementCase(Base):
+    """An investigation into one organisation. Evidence and a human decision sit behind every step."""
+
+    __tablename__ = "enforcement_cases"
+    __table_args__ = (Index("ix_enforcement_org", "organisation_id"), {"schema": "core"})
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), **PK)
+    organisation_id: Mapped[uuid.UUID] = mapped_column(fk("core.organisations.id"))
+    reasons: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
+    severity: Mapped[str] = mapped_column(String(10), default="medium")  # low, medium, high, critical
+    notes: Mapped[str | None] = mapped_column(Text)
+    evidence: Mapped[list] = mapped_column(JSONB, default=list)  # [{"kind", "note"}]
+    status: Mapped[str] = mapped_column(String(14), default="open")  # open, recommended, closed, blacklisted
+    emergency: Mapped[bool] = mapped_column(Boolean, default=False)
+    emergency_reason: Mapped[str | None] = mapped_column(Text)
+    emergency_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    opened_by: Mapped[uuid.UUID] = mapped_column(fk("core.users.id"))
+    recommended_by: Mapped[uuid.UUID | None] = mapped_column(fk("core.users.id"))
+    approved_by: Mapped[uuid.UUID | None] = mapped_column(fk("core.users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW, onupdate=func.now())
+
+
+class EnforcementAction(Base):
+    """Every step taken on a case, kept as history. Nothing here is edited or removed."""
+
+    __tablename__ = "enforcement_actions"
+    __table_args__ = (Index("ix_enforcement_action_case", "case_id"), {"schema": "core"})
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), **PK)
+    case_id: Mapped[uuid.UUID] = mapped_column(fk("core.enforcement_cases.id"))
+    organisation_id: Mapped[uuid.UUID] = mapped_column(fk("core.organisations.id"))
+    action: Mapped[str] = mapped_column(String(24))
+    previous_status: Mapped[str] = mapped_column(String(14))
+    new_status: Mapped[str] = mapped_column(String(14))
+    note: Mapped[str | None] = mapped_column(Text)
+    by_user: Mapped[uuid.UUID] = mapped_column(fk("core.users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
+
+
+class EnforcementAppeal(Base):
+    __tablename__ = "enforcement_appeals"
+    __table_args__ = (Index("ix_enforcement_appeal_org", "organisation_id"), {"schema": "core"})
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), **PK)
+    case_id: Mapped[uuid.UUID | None] = mapped_column(fk("core.enforcement_cases.id"))
+    organisation_id: Mapped[uuid.UUID] = mapped_column(fk("core.organisations.id"))
+    text: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(16), default="submitted")  # submitted, more_info, approved, rejected
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(fk("core.users.id"))
+    decision_note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), **NOW)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class SmeProfile(Base):

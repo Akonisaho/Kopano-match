@@ -124,7 +124,7 @@ export function MeaningCheck({ matchId }: { matchId: string }) {
   )
 }
 
-/** A buyer reads the track record of a business that chose to be visible. */
+/** A corporate reads the track record of a business that chose to be visible. */
 export function TrackRecord({ smeId }: { smeId: string }) {
   const t = useLoad<Performance>(() => api.trackRecord(smeId), [smeId])
   if (t.error) return null
@@ -215,7 +215,7 @@ export function SemanticSearch({ mode }: { mode: 'sme' | 'provider' }) {
   )
 }
 
-/** A buyer's own system posts opportunities with a key. The key is shown once; only a hash is kept. */
+/** A corporate's own system posts opportunities with a key. The key is shown once; only a hash is kept. */
 export function IngestPanel() {
   const toast = useToast()
   const keys = useLoad(() => api.ingestKeys())

@@ -13,6 +13,7 @@ import { Dossier } from './pages/Dossier'
 import { ImpactPage } from './pages/Impact'
 import { UnlockMap } from './pages/Insights'
 import { Ecosystem } from './pages/Ecosystem'
+import { Enforcement } from './pages/Enforcement'
 import { ProviderFeedback, SmeFeedback } from './pages/Feedback'
 import ResponsibleAI from './pages/ResponsibleAI'
 import PassportPage from './pages/PassportPage'
@@ -61,6 +62,7 @@ export default function App() {
         <Route path="consortia" element={<RequireRole roles={['sme']}><Consortia /></RequireRole>} />
         <Route path="queue" element={<RequireRole roles={['admin']}><AdminQueue /></RequireRole>} />
         <Route path="ecosystem" element={<RequireRole roles={['admin']}><Ecosystem /></RequireRole>} />
+        <Route path="enforcement" element={<RequireRole roles={['admin']}><Enforcement /></RequireRole>} />
         <Route path="feedback" element={<RequireRole roles={['sme', 'corporate', 'funder', 'support']}><FeedbackRoute /></RequireRole>} />
         <Route path="matches/:id" element={<MatchDetail />} />
         <Route path="security" element={<SecurityCentre />} />

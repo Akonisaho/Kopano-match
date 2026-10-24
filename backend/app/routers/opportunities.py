@@ -333,7 +333,10 @@ def _ranked(db: Session, opp_id: uuid.UUID) -> list[dict]:
     rows = db.execute(
         select(m.Match, m.Organisation)
         .join(m.Organisation, m.Organisation.id == m.Match.sme_id)
-        .where(m.Match.opportunity_id == opp_id)
+        .where(
+            m.Match.opportunity_id == opp_id,
+            m.Organisation.enforcement_status.notin_(("suspended", "blacklisted")),
+        )
         .order_by(m.Match.overall_score.desc())
     ).all()
     stars = insights.star_map(db, [match.sme_id for match, _ in rows])

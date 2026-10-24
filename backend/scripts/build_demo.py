@@ -718,6 +718,35 @@ def main():
         if status != 201:
             fail(f"programme review for {name}: {status} {body.get('detail')}")
 
+    # One open investigation, so the Risk & enforcement screen is not empty. Nothing is restricted:
+    # suspending it live on camera shows the whole flow.
+    import os
+
+    admin_email, admin_pw = os.environ.get("ADMIN_EMAIL"), os.environ.get("ADMIN_PASSWORD")
+    if admin_email and admin_pw:
+        status, body = api.call(
+            "POST", "/auth/login", urlencoded={"username": admin_email, "password": admin_pw}
+        )
+        if status == 200 and "access_token" in body:
+            atok = body["access_token"]
+            _, hit = api.call("GET", "/enforcement/search?q=Zanele%20Fabrication", atok)
+            if isinstance(hit, list) and hit:
+                api.call(
+                    "POST",
+                    "/enforcement/cases",
+                    atok,
+                    body={
+                        "organisation_id": hit[0]["id"],
+                        "reasons": ["fake_documents", "duplicate_organisation"],
+                        "severity": "high",
+                        "notes": "A compliance certificate has the same file as another organisation's.",
+                        "evidence": [
+                            {"kind": "Document check", "note": "Identical file hash on two accounts"}
+                        ],
+                    },
+                )
+                print("  Opened one demo investigation (Zanele Fabrication) for the admin screen.")
+
     print("Warming the AI results so every page opens instantly ...")
     from concurrent.futures import ThreadPoolExecutor
 

@@ -20,13 +20,13 @@ export function PassportCard() {
   }
   const d = p.data
   return (
-    <Panel title={t('Your Readiness Passport')} sub={t('One link that shows a buyer what you can prove. You decide who sees it.')}
+    <Panel title={t('Your Readiness Passport')} sub={t('One link that shows a corporate what you can prove. You decide who sees it.')}
       right={d && <Badge tone={d.enabled ? 'green' : 'gray'}>{d.enabled ? t('Live') : t('Off')}</Badge>}>
       {d && !d.enabled && <>
         <ul className="plain-list">
           <li>{t('Verified checks, with where each came from')}</li>
           <li>{t('Your documents and when they expire')}</li>
-          <li>{t('What you do, and your buyers’ ratings')}</li>
+          <li>{t('What you do, and your corporates’ ratings')}</li>
         </ul>
         <p className="hint">{t('It never shows your turnover, ownership or contact details.')}</p>
         <button className="btn btn-primary btn-full" onClick={() => act('enable')}>{t('Create my passport')}</button></>}

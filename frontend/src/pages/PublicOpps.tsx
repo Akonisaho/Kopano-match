@@ -78,7 +78,7 @@ export function PublicOpportunities() {
         </div>
         <div className="lx-filters">
           <span className="lx-search">
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Search by name, buyer, sector or province')} aria-label={t('Search')} />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Search by name, corporate, sector or province')} aria-label={t('Search')} />
             <VoiceButton onText={setQ} />
           </span>
           <select value={sector} onChange={(e) => setSector(e.target.value)} aria-label={t('Sector')}><option value="">{t('All sectors')}</option>{sectors.map((s) => <option key={s} value={s}>{t(pretty(s))}</option>)}</select>
@@ -158,11 +158,11 @@ export function PublicOpportunity() {
             {o.description && <p className="lx-desc">{o.description}</p>}
             <h3>{t('The work')}</h3>
             {o.scope.map((s) => <div key={s.label} className="lx-line"><span>{t(s.label)}</span><b>{zar(s.value)}</b></div>)}
-            <h3>{t('What the buyer asks for')}</h3>
+            <h3>{t('What the corporate asks for')}</h3>
             {o.requirements.map((r, i) => (
               <div key={i} className="lx-line"><span>{reqText(r)}{r.days ? <small> · {t('{n} days', { n: r.days })}{r.cost_zar ? `, ${zar(r.cost_zar)}` : `, ${t('free')}`}</small> : null}</span>
                 <em className={r.mandatory ? 'must' : ''}>{r.mandatory ? t('Required') : t('Preferred')}</em></div>))}
-            {o.preference.length > 0 && <p className="lx-note">{t('The buyer also prefers {who}-owned businesses. It is shown on the match, and capped at 10 fit points.', { who: o.preference.map((p) => p.replace('_', ' ')).join(', ') })}</p>}
+            {o.preference.length > 0 && <p className="lx-note">{t('The corporate also prefers {who}-owned businesses. It is shown on the match, and capped at 10 fit points.', { who: o.preference.map((p) => p.replace('_', ' ')).join(', ') })}</p>}
           </section>
 
           <aside className="lx-check">
@@ -193,7 +193,7 @@ export function PublicOpportunity() {
                   {res.gaps.length > 0 && <div className="grid-gaps lx-gaps">{res.gaps.map((g) => <GapCard key={g.credential} g={g} />)}</div>}
                   <details className="lx-how"><summary>{t('How the platform decided')}</summary>
                     <ol><li><b>{t('Gate.')}</b> {t('Hard requirements are checked first. Missing paperwork is coachable; a structural mismatch is not.')}</li>
-                      <li><b>{t('Fit.')}</b> {t('Capability, capacity, location, experience and the buyer’s preference, by fixed weights.')}</li>
+                      <li><b>{t('Fit.')}</b> {t('Capability, capacity, location, experience and the corporate’s preference, by fixed weights.')}</li>
                       <li><b>{t('Readiness.')}</b> {t('Valid documents count in full, expired ones at 40%, missing ones at nothing.')}</li>
                       <li><b>{t('Risk.')}</b> {t('A warning if the contract is too large for your turnover.')}</li></ol>
                     <ScoreBreakdown components={res.components} />

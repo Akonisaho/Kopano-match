@@ -150,7 +150,7 @@ $docs = Join-Path $root "demo-documents\Isizwe_Civil_Works"
 Write-Host ""
 Write-Host "Ready. API process $($api.Id)." -ForegroundColor Green
 if ($link) { Write-Host "  PUBLIC LINK: $link" -ForegroundColor Green } else { Write-Host "  Open http://localhost:5173" -ForegroundColor Green }
-Write-Host "  Business: $($Email -replace '@', '+isizwe@')   Buyer: $($Email -replace '@', '+buyer@')   Support: $($Email -replace '@', '+support@')   Password: Demo-Password-1!"
+Write-Host "  Business: $($Email -replace '@', '+isizwe@')   Corporate: $($Email -replace '@', '+buyer@')   Support: $($Email -replace '@', '+support@')   Password: Demo-Password-1!"
 Write-Host "  Admin (YES dashboard): reviewer@kopano-test.com   Password: $adminPassword"
 Write-Host "  Upload COID.pdf then CIDB.pdf from: $docs   (no date to type: it is read from the file)"
 if ($link) {

@@ -59,7 +59,7 @@ export function ReviewCard({ r }: { r: ReputationReview }) {
 }
 
 /**
- * One star rating and a count, then supporting context. The rating is context for a buyer: the
+ * One star rating and a count, then supporting context. The rating is context for a corporate: the
  * matching engine does not read it, and it never moves a match score.
  */
 export function ReputationPanel({ r, mine, showReviews = true }: { r: Reputation; mine?: boolean; showReviews?: boolean }) {
@@ -103,7 +103,7 @@ export function ReputationPanel({ r, mine, showReviews = true }: { r: Reputation
   )
 }
 
-/** A buyer reads the ratings of a business that chose to be visible. */
+/** A corporate reads the ratings of a business that chose to be visible. */
 export function TrackRecordReviews({ smeId }: { smeId: string }) {
   const t = useLoad<Reputation>(() => api.reputation(smeId), [smeId])
   if (t.error) return null
@@ -113,7 +113,7 @@ export function TrackRecordReviews({ smeId }: { smeId: string }) {
 
 const STAR_INPUT = [1, 2, 3, 4, 5]
 
-/** A funder, support programme or buyer records a programme or engagement it ran with a business. */
+/** A funder, support programme or corporate records a programme or engagement it ran with a business. */
 export function EngagementPanel({ onDone }: { onDone?: () => void }) {
   const toast = useToast()
   const list = useLoad<Eligible[]>(() => api.eligible())

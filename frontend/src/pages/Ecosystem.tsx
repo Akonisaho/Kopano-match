@@ -22,7 +22,7 @@ export function Ecosystem() {
   return (
     <>
       <Welcome hero eyebrow="Ecosystem" title="Where small businesses meet opportunity"
-        text="Demand, supply and outcomes across every buyer and funder. Aggregates only: no business is named, and small counts are hidden." />
+        text="Demand, supply and outcomes across every corporate and funder. Aggregates only: no business is named, and small counts are hidden." />
       <div className="metric-grid">
         <Metric label="Businesses on the platform" value={t.businesses} note={`${t.youth_owned} youth-owned`} />
         <Metric label="Open opportunity value" value={zar(t.open_value)} tone="#7c3aed" note={`${t.opportunities} opportunities`} />
@@ -62,7 +62,7 @@ export function Ecosystem() {
         </table></div>
         <p className="hint" style={{ marginBottom: 0 }}>{e.inclusion.note} Figures come from this demo database.</p>
       </Panel>
-      <Panel title="Sector demand against supply" sub="Pressure is open opportunities per business. A high number means buyers want more than the platform can supply.">
+      <Panel title="Sector demand against supply" sub="Pressure is open opportunities per business. A high number means corporates want more than the platform can supply.">
         <div className="table-wrap"><table>
           <thead><tr><th>Sector</th><th>Businesses</th><th>Opportunities</th><th>Open value</th><th style={{ minWidth: 160 }}>Pressure</th></tr></thead>
           <tbody>{e.sectors.map((s) => (
@@ -71,7 +71,7 @@ export function Ecosystem() {
         </table></div>
       </Panel>
       <div className="grid-2">
-        <Panel title="Skills buyers ask for" sub="Requested in opportunities, against businesses that hold the capability.">
+        <Panel title="Skills corporates ask for" sub="Requested in opportunities, against businesses that hold the capability.">
           {e.skills.map((s) => (
             <div key={s.code} style={{ marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, gap: 8 }}>
@@ -83,7 +83,7 @@ export function Ecosystem() {
           <p className="hint" style={{ marginBottom: 0 }}><span style={{ color: '#2563eb' }}>Blue</span> is demand, <span style={{ color: '#7c3aed' }}>purple</span> is supply.</p>
         </Panel>
         <div>
-          <Panel title="Underserved categories" sub="Requested by buyers, with two or fewer businesses able to deliver.">
+          <Panel title="Underserved categories" sub="Requested by corporates, with two or fewer businesses able to deliver.">
             {e.underserved.length ? e.underserved.map((u) => (
               <div key={u.label} className="metric-row"><span>{u.label}</span><Badge tone="amber">{u.requested} asked · {u.businesses} offer</Badge></div>
             )) : <p className="hint" style={{ margin: 0 }}>No category is under-supplied right now.</p>}
@@ -99,12 +99,12 @@ export function Ecosystem() {
         </div>
       </div>
       <div className="grid-2">
-        <Panel title="How buyers rate delivery" sub={`${e.quality.reviews} review${e.quality.reviews === 1 ? '' : 's'} across all businesses`}>
+        <Panel title="How corporates rate delivery" sub={`${e.quality.reviews} review${e.quality.reviews === 1 ? '' : 's'} across all businesses`}>
           {e.quality.reviews ? e.quality.criteria.map((c) => (
             <div key={c.key} style={{ marginBottom: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span>{c.label}</span><b className="mono">{c.average ?? '–'}</b></div>
               <Bar value={c.average ?? 0} max={5} />
-            </div>)) : <p className="hint" style={{ margin: 0 }}>Ratings appear after buyers review awarded work.</p>}
+            </div>)) : <p className="hint" style={{ margin: 0 }}>Ratings appear after corporates review awarded work.</p>}
           <p className="hint" style={{ marginBottom: 0 }}>A low average on one criterion shows where support would help most, such as delivery or compliance.</p>
         </Panel>
         <Panel title="Employment potential" sub="An indicative estimate, not a measured result.">

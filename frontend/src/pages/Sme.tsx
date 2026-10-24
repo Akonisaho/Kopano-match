@@ -115,7 +115,7 @@ export function SmeOverview() {
             <h4 style={{ margin: '0 0 4px' }}>{best.opportunity}</h4>
             <p className="hint">{zar(best.contract_value)} · {best.gate === 'pass' ? t('All mandatory requirements met') : t('Mandatory documents outstanding')}</p>
             <Link className="btn btn-primary btn-full" style={{ marginTop: 12 }} to={`/app/matches/${best.match_id}`}>{t('See why')}</Link>
-          </> : <div className="empty"><strong>{t('No matches yet')}</strong>{t('Buyers run matching when they publish an opportunity.')}</div>}
+          </> : <div className="empty"><strong>{t('No matches yet')}</strong>{t('Corporates run matching when they publish an opportunity.')}</div>}
         </Panel>
       </div>
       {dash.data && dash.data.open_gaps.length > 0 && <UnlockPlan gaps={dash.data.open_gaps} />}
@@ -551,8 +551,8 @@ export function Consortia() {
   return (
     <>
       <Welcome title="Consortium invitations"
-        text="When no single business can deliver a whole contract, a buyer can propose a group. You see your own part and how many partners there are. Partner names are shared only once everyone has accepted." />
-      {list.data.length === 0 ? <Panel><div className="empty"><strong>No invitations</strong>If a buyer proposes you for a group bid, it appears here and in your notifications.</div></Panel>
+        text="When no single business can deliver a whole contract, a corporate can propose a group. You see your own part and how many partners there are. Partner names are shared only once everyone has accepted." />
+      {list.data.length === 0 ? <Panel><div className="empty"><strong>No invitations</strong>If a corporate proposes you for a group bid, it appears here and in your notifications.</div></Panel>
         : list.data.map((c) => (
           <Panel key={c.id} title={c.opportunity.title} sub={`${c.opportunity.provider} · ${zar(c.opportunity.contract_value)}`}
             right={<Badge tone={c.status === 'formed' ? 'green' : c.status === 'declined' ? 'gray' : 'amber'}>{c.status === 'proposed' ? 'Waiting' : pretty(c.status)}</Badge>}>

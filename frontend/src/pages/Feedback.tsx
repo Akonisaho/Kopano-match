@@ -26,10 +26,10 @@ function Rating({ value, onChange }: { value: number; onChange?: (n: number) => 
 /** A business's track record. Fewer than three reviews is labelled an early signal, not a rating. */
 export function PerformanceCard({ p }: { p: Performance; mine?: boolean }) {
   // The headline star rating lives in the Ratings & reviews panel. This is the delivery detail
-  // behind it, and only exists once a buyer has rated awarded work on the six criteria.
+  // behind it, and only exists once a corporate has rated awarded work on the six criteria.
   if (!p.criteria.some((c) => c.average != null)) return null
   return (
-    <Panel title="Delivery detail" sub="How buyers rated awarded work, by criterion">
+    <Panel title="Delivery detail" sub="How corporates rated awarded work, by criterion">
       {p.criteria.map((c) => (
         <div key={c.key} style={{ marginBottom: 9 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span>{c.label}</span><b className="mono">{c.average ?? '–'}</b></div>
@@ -102,7 +102,7 @@ function FeedbackCard({ f, right, both }: { f: FeedbackItem; right?: React.React
   )
 }
 
-/** Buyer view: rate awarded work, and see what you have already said. */
+/** Corporate view: rate awarded work, and see what you have already said. */
 export function ProviderFeedback() {
   const waiting = useLoad(() => api.feedbackAwaiting())
   const given = useLoad(() => api.feedbackGiven())
@@ -111,7 +111,7 @@ export function ProviderFeedback() {
   const reload = () => { waiting.reload(); given.reload() }
   return (
     <>
-      <Welcome title="Feedback" text="After you award work, rate how it went. Ratings build a fair track record that other buyers can see. The business can respond, or dispute a rating for a reviewer to decide." />
+      <Welcome title="Feedback" text="After you award work, rate how it went. Ratings build a fair track record that other corporates can see. The business can respond, or dispute a rating for a reviewer to decide." />
       <Panel title="Awards waiting for your feedback">
         {waiting.data.length ? <div className="table-wrap"><table>
           <thead><tr><th>Business</th><th>Opportunity</th><th>Value</th><th>Awarded</th><th /></tr></thead>
@@ -173,7 +173,7 @@ export function SmeFeedback() {
         </div>
         <Panel title="Reviews">
           {d.data.items.length ? d.data.items.map((f) => <FeedbackCard key={f.id} f={f} right={<Answer f={f} onDone={d.reload} />} />)
-            : <div className="empty"><strong>No reviews yet</strong>Once a buyer awards you work and rates it, it appears here.</div>}
+            : <div className="empty"><strong>No reviews yet</strong>Once a corporate awards you work and rates it, it appears here.</div>}
         </Panel>
       </div>
     </>

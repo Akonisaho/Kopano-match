@@ -30,9 +30,9 @@ export default function UnlockCelebration({ items, onClose }: { items: Unlocked[
   }, [total])
 
   async function apply(id: string) {
-    try { await api.apply(id); setApplied((a) => [...a, id]); toast(t('Applied. The buyer has been told.')) } catch (err) { toast((err as Error).message, 'error') }
+    try { await api.apply(id); setApplied((a) => [...a, id]); toast(t('Applied. The corporate has been told.')) } catch (err) { toast((err as Error).message, 'error') }
   }
-  const spoken = `${t('Unlocked')}. ${zar(total)}. ${t('You are now award ready. The buyer has been told.')}`
+  const spoken = `${t('Unlocked')}. ${zar(total)}. ${t('You are now award ready. The corporate has been told.')}`
   return (
     <div className="celebrate" role="dialog" aria-modal="true" aria-label={t('Unlocked')}>
       <div className="celebrate-sparks" aria-hidden>
@@ -42,7 +42,7 @@ export default function UnlockCelebration({ items, onClose }: { items: Unlocked[
       <div className="celebrate-card">
         <small>{t('Unlocked')}</small>
         <h2>{zar(n)}</h2>
-        <p>{t('You are now award ready. The buyer has been told.')}</p>
+        <p>{t('You are now award ready. The corporate has been told.')}</p>
         <div style={{ marginBottom: 16 }}><ReadAloud text={spoken} /></div>
         <div className="celebrate-list">
           {items.map((i) => (

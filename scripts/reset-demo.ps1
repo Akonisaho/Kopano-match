@@ -55,6 +55,8 @@ $adminPassword = "Another-Strong-Pass-9!"
 $env:DATABASE_URL = "postgresql+psycopg2://kopano_app:kopano_app_dev@localhost:55432/$Db"
 $env:ADMIN_DATABASE_URL = "postgresql+psycopg2://postgres:postgres@localhost:55432/$Db"
 $env:ADMIN_EMAIL = "reviewer@kopano-test.com"
+# A blacklist needs a second person to approve it, so the demo has a second reviewer
+$env:SECOND_ADMIN_EMAIL = "second@kopano-test.com"
 if (-not $RealEmail) { $env:EMAIL_PROVIDER = "log" }
 # Local mode reads documents and compares text on this computer: instant, offline, nothing leaves it.
 # Add -LiveAI to use Gemini (needs the key in backend/.env and a network).
@@ -152,6 +154,7 @@ Write-Host "Ready. API process $($api.Id)." -ForegroundColor Green
 if ($link) { Write-Host "  PUBLIC LINK: $link" -ForegroundColor Green } else { Write-Host "  Open http://localhost:5173" -ForegroundColor Green }
 Write-Host "  Business: $($Email -replace '@', '+isizwe@')   Corporate: $($Email -replace '@', '+buyer@')   Support: $($Email -replace '@', '+support@')   Password: Demo-Password-1!"
 Write-Host "  Admin (YES dashboard): reviewer@kopano-test.com   Password: $adminPassword"
+Write-Host "  Second admin (approves a blacklist): second@kopano-test.com   Password: $adminPassword"
 Write-Host "  Upload COID.pdf then CIDB.pdf from: $docs   (no date to type: it is read from the file)"
 if ($link) {
     Write-Host ""

@@ -136,6 +136,22 @@ export const api = {
   feedbackDisputes: () => request<FeedbackItem[]>('/feedback/disputes'),
   resolveFeedback: (id: string, decision: 'uphold' | 'remove', note: string) =>
     request<unknown>(`/feedback/${id}/resolve`, json('POST', { decision, note })),
+  enfOverview: () => request<EnfOverview>('/enforcement/overview'),
+  enfOptions: () => request<{ reasons: Record<string, string>; restrictions: Record<string, string> }>('/enforcement/options'),
+  enfSearch: (q: string) => request<EnfOrg[]>(`/enforcement/search?q=${encodeURIComponent(q)}`),
+  enfOpen: (body: { organisation_id: string; reasons: string[]; severity: string; notes: string; evidence: { kind: string; note: string }[] }) =>
+    request<EnfCase>('/enforcement/cases', json('POST', body)),
+  enfCase: (id: string) => request<EnfCase>(`/enforcement/cases/${id}`),
+  enfAct: (id: string, body: { action: string; note: string; restrictions?: string[]; evidence?: { kind: string; note: string } }) =>
+    request<EnfCase>(`/enforcement/cases/${id}/action`, json('POST', body)),
+  enfDecideAppeal: (id: string, decision: string, note: string) =>
+    request<unknown>(`/enforcement/appeals/${id}/decide`, json('POST', { decision, note })),
+  enfStatus: () => request<EnfStatus>('/enforcement/status'),
+  enfAppeal: (text: string) => request<unknown>('/enforcement/appeal', json('POST', { text })),
+  reputation: (smeId: string) => request<Reputation>(`/feedback/reputation/${smeId}`),
+  myReputation: () => request<Reputation>('/feedback/reputation/mine'),
+  eligible: () => request<Eligible[]>('/feedback/engagement/eligible'),
+  leaveEngagement: (body: EngagementBody) => request<{ id: string }>('/feedback/engagement', json('POST', body)),
   trackRecord: (smeId: string) => request<Performance>(`/feedback/performance/${smeId}`),
   readDocument: (id: string) => request<DocReading>(`/documents/${id}/extract`, json('POST')),
   setExpiry: (id: string, expiry_date: string) => request<Doc>(`/documents/${id}/expiry`, json('PUT', { expiry_date })),
@@ -239,6 +255,7 @@ export interface MatchRow {
   match_id: string; sme_id: string; sme_name: string; verification_status: string
   gate: string; quadrant: Quadrant; fit: number; readiness: number; overall: number
   risk_flags: RiskFlags; gap_count: number; status: string
+  rating?: number | null; reviews?: number
 }
 export interface Consortium {
   lead: { sme_id: string; name: string }; members: { sme_id: string; name: string }[]
@@ -370,8 +387,47 @@ export const QUADRANT_BADGE: Record<Quadrant, string> = {
 export interface AwaitingReview { application_id: string; sme: string; opportunity: string; awarded_value: number; awarded_at: string }
 export interface FeedbackItem {
   id: string; sme: string; provider: string; ratings: Record<string, number>; comment: string | null
+  kind: string; programme: string | null; context: ReviewContext
   status: 'published' | 'responded' | 'disputed' | 'upheld' | 'removed'
   response: string | null; dispute_reason: string | null; resolution_note: string | null; created_at: string
+}
+export interface EnfOrg { id: string; name: string; org_type: string; registration_number: string | null; status: string }
+export interface EnfCase {
+  id: string; ref: string; organisation_id: string; organisation: string; org_type: string; registration_number: string | null
+  entity_status: string; restrictions: string[]; verification_status: string; reasons: string[]; severity: string
+  notes: string | null; evidence: { kind: string; note: string }[]; status: string; emergency: boolean
+  emergency_reason: string | null; recommended_by: string | null; approved_by: string | null
+  needs_second_person: boolean; created_at: string; updated_at: string
+  history?: { action: string; from: string; to: string; note: string | null; by: string | null; at: string }[]
+  linked?: { id: string; name: string; signal: string }[]
+}
+export interface EnfOverview {
+  counts: Record<string, number>; cases: EnfCase[]
+  appeals: { id: string; organisation: string; text: string; status: string; decision_note: string | null; created_at: string }[]
+}
+export interface EnfStatus {
+  status: string; restrictions?: string[]; reference?: string | null; message?: string | null
+  appeal?: { status: string; note: string | null } | null
+}
+export interface ReviewContext {
+  duration?: string; total_sessions?: number; sessions_attended?: number
+  completion?: 'completed' | 'in_progress' | 'not_completed'
+}
+export interface ReputationReview {
+  id: string; rating: number; reviewer: string; reviewer_type: string; kind: string; kind_label: string
+  programme: string | null; comment: string | null; context: ReviewContext; response: string | null
+  status: string; basis: string; created_at: string
+}
+export interface Reputation {
+  rating: number | null; reviews: number; reliable: boolean; distribution: Record<string, number>
+  stats: { awards: number; reviewed_contracts: number; programmes: number }
+  badges: { key: string; label: string; why: string }[]
+  reviews_list: ReputationReview[]
+  timeline: { when: string; title: string; detail: string; rating: number | null; type: 'review' | 'award' }[]
+}
+export interface Eligible { sme_id: string; name: string; basis: 'application' | 'assisted' }
+export interface EngagementBody {
+  sme_id: string; kind: string; programme: string; rating: number; comment?: string; context?: ReviewContext
 }
 export interface Performance {
   reviews: number; reliable: boolean; overall: number | null

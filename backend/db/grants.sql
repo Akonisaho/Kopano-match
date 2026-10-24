@@ -6,6 +6,9 @@ GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA sensitive TO kopano_app;
 GRANT INSERT, SELECT ON audit.audit_logs TO kopano_app;
 REVOKE UPDATE, DELETE ON audit.audit_logs FROM kopano_app;
 
+-- The history of enforcement steps is append-only too.
+REVOKE UPDATE, DELETE ON core.enforcement_actions FROM kopano_app;
+
 -- POPIA erasure: anonymise rather than delete, so audit rows survive.
 CREATE OR REPLACE FUNCTION core.anonymise_user(uid uuid) RETURNS void
 LANGUAGE sql SECURITY DEFINER SET search_path = core, pg_temp AS $$

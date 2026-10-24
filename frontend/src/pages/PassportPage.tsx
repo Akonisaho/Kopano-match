@@ -4,7 +4,7 @@ import { useLoad } from '../hooks'
 import { LangSwitch, useT } from '../i18n'
 import { Badge, Logo, Spinner } from '../ui'
 
-/** The public page a business shares with a buyer. No sign-in. Only what the business chose to show. */
+/** The public page a business shares with a corporate. No sign-in. Only what the business chose to show. */
 export default function PassportPage() {
   const { token = '' } = useParams()
   const t = useT()
@@ -47,8 +47,8 @@ export default function PassportPage() {
                 </section>
                 <section>
                   <h3>{t('Track record')}</h3>
-                  {tr.reviews ? <p style={{ margin: 0 }}><b className="pp-score">{tr.overall?.toFixed(1)}</b> {tr.reviews === 1 ? t('out of 5 from 1 buyer review') : t('out of 5 from {n} buyer reviews', { n: tr.reviews })} <Badge tone={tr.reliable ? 'green' : 'amber'}>{tr.reliable ? t('Established') : t('Early signal')}</Badge></p>
-                    : <p className="hint" style={{ margin: 0 }}>{t('No buyer reviews yet.')}</p>}
+                  {tr.reviews ? <p style={{ margin: 0 }}><b className="pp-score">{tr.overall?.toFixed(1)}</b> {tr.reviews === 1 ? t('out of 5 from 1 corporate review') : t('out of 5 from {n} corporate reviews', { n: tr.reviews })} <Badge tone={tr.reliable ? 'green' : 'amber'}>{tr.reliable ? t('Established') : t('Early signal')}</Badge></p>
+                    : <p className="hint" style={{ margin: 0 }}>{t('No corporate reviews yet.')}</p>}
                 </section>
                 <p className="hint passport-notice">{t(x.notice)}</p>
               </div>

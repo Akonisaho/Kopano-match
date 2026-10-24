@@ -210,6 +210,10 @@ def _decide(match_id: uuid.UUID, new_status: str, user: m.User, db: Session) -> 
     match = readable_match(db, user, match_id)
     if match.status == "awarded":
         raise HTTPException(409, "This match has already been awarded")
+    if new_status == "shortlisted":
+        from ..enforcement import refuse_if_blocked
+
+        refuse_if_blocked(db, match.sme_id)  # its status may have changed since it was matched
     old = match.status
     match.status = new_status
     write_audit(

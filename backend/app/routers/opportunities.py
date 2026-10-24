@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFil
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import insights
 from .. import models as m
 from ..audit import write_audit
 from ..auth import KINDS_BY_ROLE, PROVIDER_ROLES, current_user, require_role
@@ -332,10 +333,21 @@ def _ranked(db: Session, opp_id: uuid.UUID) -> list[dict]:
     rows = db.execute(
         select(m.Match, m.Organisation)
         .join(m.Organisation, m.Organisation.id == m.Match.sme_id)
-        .where(m.Match.opportunity_id == opp_id)
+        .where(
+            m.Match.opportunity_id == opp_id,
+            m.Organisation.enforcement_status.notin_(("suspended", "blacklisted")),
+        )
         .order_by(m.Match.overall_score.desc())
     ).all()
-    return [_match_row(match, org) for match, org in rows]
+    stars = insights.star_map(db, [match.sme_id for match, _ in rows])
+    out = []
+    for match, org in rows:
+        row = _match_row(match, org)
+        # Context beside the score. The order above is by match score alone.
+        rating, n = stars.get(match.sme_id, (None, 0))
+        row["rating"], row["reviews"] = rating, n
+        out.append(row)
+    return out
 
 
 @router.get("/{opp_id}/consortium")

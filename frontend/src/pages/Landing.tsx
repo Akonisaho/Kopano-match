@@ -9,7 +9,7 @@ import { useT } from '../i18n'
 import { ROLES } from '../roles'
 import { OppCard } from './PublicOpps'
 
-const BUSINESS = [['Verify once', 'Registry, tax and identity checks, each with its source shown.'], ['See the gap', 'Every missing document, with the days and rand to fix it.'], ['Share your passport', 'One link that proves what you can show any buyer.']]
+const BUSINESS = [['Verify once', 'Registry, tax and identity checks, each with its source shown.'], ['See the gap', 'Every missing document, with the days and rand to fix it.'], ['Share your passport', 'One link that proves what you can show any corporate.']]
 const BUYER = [['Post as rules', 'Requirements become gates and weighted preferences.'], ['Get a ranked shortlist', 'Two scores each, with reasons, and a warning when a contract is too big.'], ['Award, then rate', 'Structured feedback builds a track record a business can answer.']]
 const EDGE: [string, string, string][] = [
   ['layers', 'Two scores, not one', 'A strong business with missing paperwork is coachable, never just rejected.'],
@@ -89,7 +89,7 @@ export default function Landing({ initialAuth }: { initialAuth?: 'login' | 'sign
         <section className="lx-section" id="how">
           <Reveal><h2>{t('One journey, two sides.')}</h2></Reveal>
           <div className="lx-two">
-            {[['For businesses', BUSINESS], ['For buyers and funders', BUYER]].map(([title, steps], side) => (
+            {[['For businesses', BUSINESS], ['For corporates and funders', BUYER]].map(([title, steps], side) => (
               <Reveal key={title as string} className="lx-panel" delay={side * 140}>
                 <h3>{t(title as string)}</h3>
                 {(steps as string[][]).map(([h, d], i) => (

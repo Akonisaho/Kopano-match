@@ -1,4 +1,5 @@
 import { ImportPanel, IngestPanel, SemanticSearch } from '../components/AiPanels'
+import { StarChip } from '../components/Reputation'
 import { AssistPanel } from '../components/AssistPanel'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -268,7 +269,7 @@ export function OpportunityDetail() {
         {rows.data.length ? <div className="table-wrap"><table>
           <thead><tr><th>SME</th><th>Fit</th><th>Readiness</th><th>Position</th>{procurement && <th>Risk</th>}<th>Verification</th><th /></tr></thead>
           <tbody>{rows.data.filter((r) => qf === 'all' || r.quadrant === qf).map((r) => (
-            <tr key={r.match_id}><td><Link to={`/app/matches/${r.match_id}`} style={{ color: 'var(--purple)', fontWeight: 700 }}>{r.sme_name}</Link></td>
+            <tr key={r.match_id}><td><Link to={`/app/matches/${r.match_id}`} style={{ color: 'var(--purple)', fontWeight: 700 }}>{r.sme_name}</Link><br /><StarChip rating={r.rating} reviews={r.reviews} /></td>
               <td className="mono">{r.fit}<MiniBar value={r.fit} /></td><td className="mono">{r.readiness}<MiniBar value={r.readiness} /></td>
               <td><QuadrantBadge q={r.quadrant} />{r.gap_count > 0 && <><br /><small>{r.gap_count} gap{r.gap_count > 1 ? 's' : ''}</small></>}</td>
               {procurement && <td>{[r.risk_flags.overtrading && 'Overtrading', r.risk_flags.concentration && 'Concentration'].filter(Boolean).map((x) => <Badge key={String(x)} tone="red">{x}</Badge>)}</td>}

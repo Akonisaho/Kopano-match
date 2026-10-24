@@ -4,6 +4,7 @@ import { api, dateFmt, pretty, QUADRANT_LABEL, zar, type Doc, type DocReading, t
 import { useLoad } from '../hooks'
 import { useT } from '../i18n'
 import { PerformanceCard } from '../pages/Feedback'
+import { TrackRecordReviews } from './Reputation'
 import { Badge, Modal, Panel, Spinner, useToast } from '../ui'
 import { VoiceButton } from './Voice'
 
@@ -123,12 +124,12 @@ export function MeaningCheck({ matchId }: { matchId: string }) {
   )
 }
 
-/** A buyer reads the track record of a business that chose to be visible. */
+/** A corporate reads the track record of a business that chose to be visible. */
 export function TrackRecord({ smeId }: { smeId: string }) {
   const t = useLoad<Performance>(() => api.trackRecord(smeId), [smeId])
   if (t.error) return null
   if (!t.data) return <Spinner />
-  return <PerformanceCard p={t.data} />
+  return <><TrackRecordReviews smeId={smeId} /><PerformanceCard p={t.data} /></>
 }
 
 /** Bulk-load opportunities from a CSV export. Checked first, all or nothing. */
@@ -214,7 +215,7 @@ export function SemanticSearch({ mode }: { mode: 'sme' | 'provider' }) {
   )
 }
 
-/** A buyer's own system posts opportunities with a key. The key is shown once; only a hash is kept. */
+/** A corporate's own system posts opportunities with a key. The key is shown once; only a hash is kept. */
 export function IngestPanel() {
   const toast = useToast()
   const keys = useLoad(() => api.ingestKeys())

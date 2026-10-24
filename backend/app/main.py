@@ -10,6 +10,7 @@ from .routers import (
     auth,
     consortia,
     documents,
+    enforcement,
     feedback,
     inclusion,
     ingest,
@@ -81,6 +82,7 @@ for r in (
     passport,
     public,
     inclusion,
+    enforcement,
 ):
     app.include_router(r.router)
 

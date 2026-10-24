@@ -16,7 +16,7 @@ function Bars({ rows }: { rows: { name: string; value: number }[] }) {
   )
 }
 
-/** What reached SMEs: the number a buyer reports on and a funder asks for. Aggregates only. */
+/** What reached SMEs: the number a corporate reports on and a funder asks for. Aggregates only. */
 export function ImpactPage() {
   const toast = useToast()
   const d = useLoad(() => api.impact())
@@ -62,7 +62,7 @@ export function ImpactPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span>{pretty(f)}-owned</span><b className="mono">{x.ownership[f].share_pct}% <span className="hint">({x.ownership[f].awards} awards)</span></b></div>
               <div className="progress" style={{ height: 8 }} aria-hidden><i style={{ width: `${x.ownership[f].share_pct}%` }} /></div>
             </div>))}
-          <p className="hint">Ownership is shown only in aggregate, for the buyer that made the award.</p>
+          <p className="hint">Ownership is shown only in aggregate, for the corporate that made the award.</p>
         </Panel>
         <Panel title="Where the value went"><h4 style={{ fontSize: 12, margin: '0 0 8px' }}>By province</h4><Bars rows={x.by_province} />
           <h4 style={{ fontSize: 12, margin: '16px 0 8px' }}>By sector</h4><Bars rows={x.by_sector} /></Panel>

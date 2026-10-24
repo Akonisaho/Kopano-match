@@ -68,6 +68,20 @@ def create_admin_only(admin_engine) -> None:
                 consent_at=datetime.now(UTC),
             )
         )
+        # Permanent enforcement needs two different administrators. A demo can name a second one;
+        # nothing is created unless SECOND_ADMIN_EMAIL is set.
+        second = os.environ.get("SECOND_ADMIN_EMAIL", "").lower()
+        if second:
+            db.add(
+                m.User(
+                    email=second,
+                    password_hash=hash_password(password),
+                    full_name="Second Reviewer",
+                    role="admin",
+                    consent_version=settings.consent_version,
+                    consent_at=datetime.now(UTC),
+                )
+            )
         db.add(
             m.AuditLog(
                 user_id=None, action="bootstrap", entity_type="system", new_value={"mode": "empty"}

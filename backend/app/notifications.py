@@ -250,7 +250,8 @@ def feedback_received(db: Session, fb: m.Feedback) -> None:
             u,
             "New feedback on your work",
             [
-                f"{provider.name} left feedback on a recent award.",
+                f"{provider.name} left feedback on "
+                + ("a recent award." if fb.application_id else "a programme you took part in."),
                 "You can respond to it, or dispute it if you think it is unfair.",
             ],
             "Read the feedback",

@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -58,9 +58,15 @@ def current_user(token: str = Depends(oauth2), db: Session = Depends(get_db)) ->
 def require_role(*roles: str):
     """Deny by default: every route names the roles it admits."""
 
-    def dependency(user: User = Depends(current_user)) -> User:
+    def dependency(
+        request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)
+    ) -> User:
         if user.role not in roles:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Role not permitted")
+        # A suspended or restricted organisation can still read why, but cannot act
+        from .enforcement import guard
+
+        guard(db, user, request.method, request.url.path)
         return user
 
     return dependency

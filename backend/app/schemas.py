@@ -1,6 +1,7 @@
 """Request bodies. Every route takes one of these, so nothing unvalidated reaches the database."""
 
 import re
+import uuid
 from datetime import date
 from typing import Literal
 
@@ -222,6 +223,91 @@ class FeedbackIn(Strict):
         if any(not 1 <= x <= 5 for x in v.values()):
             raise ValueError("Each rating is from 1 to 5")
         return v
+
+
+class EngagementContext(Strict):
+    """Facts about a programme. Attendance is a record of attending, not a certification."""
+
+    duration: str | None = Field(default=None, max_length=40)
+    total_sessions: int | None = Field(default=None, ge=1, le=1000)
+    sessions_attended: int | None = Field(default=None, ge=0, le=1000)
+    completion: Literal["completed", "in_progress", "not_completed"] | None = None
+
+    @model_validator(mode="after")
+    def attended_within_total(self):
+        if (
+            self.total_sessions is not None
+            and self.sessions_attended is not None
+            and self.sessions_attended > self.total_sessions
+        ):
+            raise ValueError("Sessions attended cannot be more than the total")
+        return self
+
+
+class EngagementIn(Strict):
+    """A review of a programme or relationship that is not an award: training, incubation, funding."""
+
+    sme_id: uuid.UUID
+    kind: Literal[
+        "training",
+        "incubation",
+        "acceleration",
+        "mentorship",
+        "funding",
+        "grant",
+        "supplier_dev",
+        "enterprise_dev",
+        "business_support",
+        "investment",
+        "other",
+    ]
+    programme: str = Field(min_length=3, max_length=200)
+    rating: int = Field(ge=1, le=5)
+    comment: str | None = Field(default=None, max_length=1000)
+    context: EngagementContext | None = None
+
+    _clean = field_validator("comment")(_no_personal_details)
+
+
+class EvidenceIn(Strict):
+    kind: str = Field(min_length=2, max_length=40)  # e.g. document check, duplicate hash, user report
+    note: str = Field(min_length=3, max_length=1000)
+
+
+class CaseIn(Strict):
+    organisation_id: uuid.UUID
+    reasons: list[str] = Field(min_length=1, max_length=8)
+    severity: Literal["low", "medium", "high", "critical"] = "medium"
+    notes: str = Field(min_length=5, max_length=2000)
+    evidence: list[EvidenceIn] = Field(default_factory=list, max_length=20)
+
+
+class CaseActionIn(Strict):
+    action: Literal[
+        "request_info",
+        "warn",
+        "restrict",
+        "suspend",
+        "emergency_suspend",
+        "recommend_blacklist",
+        "approve_blacklist",
+        "reject_blacklist",
+        "close",
+        "reinstate",
+        "add_evidence",
+    ]
+    note: str = Field(min_length=3, max_length=2000)
+    restrictions: list[str] = Field(default_factory=list, max_length=8)
+    evidence: EvidenceIn | None = None
+
+
+class AppealIn(Strict):
+    text: str = Field(min_length=10, max_length=2000)
+
+
+class AppealDecisionIn(Strict):
+    decision: Literal["approve", "reject", "more_info"]
+    note: str = Field(min_length=3, max_length=1000)
 
 
 class FeedbackResponseIn(Strict):

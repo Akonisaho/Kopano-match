@@ -106,6 +106,9 @@ def award(
         raise HTTPException(409, "Already awarded")
     if match.status != "shortlisted":
         raise HTTPException(409, "Shortlist the SME before awarding")
+    from ..enforcement import refuse_if_blocked
+
+    refuse_if_blocked(db, match.sme_id)
     now = datetime.now(UTC)
     app = db.scalar(select(m.Application).where(m.Application.match_id == match.id))
     if app is None:

@@ -30,7 +30,8 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
     r.lang = speechCode(lang)
     r.interimResults = false
     r.maxAlternatives = 1
-    r.onresult = (e) => onText(e.results[0][0].transcript)
+    // Chrome adds a full stop, as if it were a sentence. A search is not a sentence, so drop it.
+    r.onresult = (e) => onText(e.results[0][0].transcript.trim().replace(/[\s.,!?;:。]+$/u, ''))
     r.onend = () => setOn(false)
     r.onerror = () => setOn(false)
     setOn(true)

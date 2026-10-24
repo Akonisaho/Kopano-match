@@ -7,7 +7,7 @@ const USES: [string, string, string][] = [
   ['Reading a document', 'Gemini reads an uploaded certificate and drafts the fields. It only runs when the business presses the button, and the result is checked against the account before anyone saves it.', 'AI drafts, a person confirms'],
   ['Reading a tender', 'Turns pasted tender text into requirements. Every value is checked against fixed lists, so it can at worst produce an empty or wrong draft.', 'AI drafts, a person confirms'],
   ['Meaning check', 'Compares what an opportunity says with what a business does, by meaning. It sees no name, no ownership and no size, and sits beside the score.', 'Advisory only'],
-  ['Summarising feedback', 'Condenses buyer ratings and comments into two or three sentences, using only what was written.', 'Advisory only'],
+  ['Summarising feedback', 'Condenses corporate ratings and comments into two or three sentences, using only what was written.', 'Advisory only'],
   ['Plain-language match note', 'Writes the paragraph that explains a match, from the stored figures. A template is used when the AI is unavailable.', 'Wording only'],
 ]
 const NOT_AI = ['Fit and readiness scores', 'Whether a business passes a hard requirement', 'The ranked shortlist', 'Who is shortlisted or awarded', 'Who a document check flags']
@@ -62,7 +62,7 @@ export default function ResponsibleAI() {
             <p className="hint">{e.benchmark.rubric} The engine matches fit-only ranking on NDCG and does better on precision, because it also accounts for readiness. {e.benchmark.relevant_excluded_by_gates} of {e.benchmark.relevant_pairs} relevant pairs were removed by a hard requirement; that is the cost of hard gates, and it is shown here instead of hidden.</p>
 
             <h3>Fairness audit</h3>
-            <p>Ownership is never an input to fit or readiness unless a buyer sets a transformation preference. We prove it by flipping every business's ownership across {e.fairness.counterfactual_pairs} neutral pairs: {e.fairness.scores_changed_by_ownership} scores changed. When a buyer does set a preference, it can move fit by at most {e.fairness.disclosed_max_fit_effect} points, and it is shown on the match.</p>
+            <p>Ownership is never an input to fit or readiness unless a corporate sets a transformation preference. We prove it by flipping every business's ownership across {e.fairness.counterfactual_pairs} neutral pairs: {e.fairness.scores_changed_by_ownership} scores changed. When a corporate does set a preference, it can move fit by at most {e.fairness.disclosed_max_fit_effect} points, and it is shown on the match.</p>
             <div className="table-wrap"><table>
               <thead><tr><th>Group</th><th>Businesses</th><th>Matched (not excluded)</th><th>Award ready</th></tr></thead>
               <tbody>{e.fairness.groups.map((g) => <tr key={g.group}><td>{g.group}</td><td>{g.businesses}</td><td><Pct v={g.kept_rate} /></td><td><Pct v={g.award_ready_rate} /></td></tr>)}</tbody>

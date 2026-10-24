@@ -827,3 +827,183 @@ def test_the_engine_reads_no_free_text_and_says_which_inputs_it_does_read():
     assert not {"description", "bio", "language", "notes"} & set(
         e["inputs"]["business"] + e["inputs"]["opportunity"]
     )
+
+
+def test_programme_reviews_need_a_confirmed_relationship_and_never_touch_a_score():
+    import pathlib
+
+    officer = login("support@kopano.demo")
+    n = uuid.uuid4().hex[:8]
+    name = f"Reviewed {n}"
+    body = {
+        "full_name": "Lindiwe Ncube",
+        "email": f"{n}@kopano-test.com",
+        "organisation_name": name,
+        "registration_number": f"2022/{int(n, 16) % 900000 + 100000}/06",
+        "language": "en",
+        "consent": True,
+    }
+    made = client.post("/assist/businesses", headers=officer, json=body)
+    assert made.status_code == 201, made.text
+    token = made.json()["setup_link"].split("token=")[1]
+    pw = "a-brand-new-long-password"
+    client.post("/auth/reset", json={"token": token, "new_password": pw})
+    sme = {
+        "Authorization": "Bearer "
+        + client.post("/auth/login", data={"username": body["email"], "password": pw}).json()[
+            "access_token"
+        ]
+    }
+
+    # A new business is "no ratings yet", never a zero
+    fresh = client.get("/feedback/reputation/mine", headers=sme).json()
+    assert fresh["rating"] is None and fresh["reviews"] == 0 and fresh["badges"] == []
+
+    eligible = {r["name"]: r for r in client.get("/feedback/engagement/eligible", headers=officer).json()}
+    assert eligible[name]["basis"] == "assisted"
+    sme_id = eligible[name]["sme_id"]
+    review = {
+        "sme_id": sme_id,
+        "kind": "training",
+        "programme": "Financial Management Training",
+        "rating": 4,
+        "comment": "Attended four of the five days and took part well.",
+        "context": {
+            "duration": "5 days",
+            "total_sessions": 5,
+            "sessions_attended": 4,
+            "completion": "completed",
+        },
+    }
+
+    # Only a confirmed relationship can review: another programme, a buyer with no history, a business
+    outsider = login("corporate@kopano.demo")
+    assert client.post("/feedback/engagement", headers=outsider, json=review).status_code == 403
+    assert client.post("/feedback/engagement", headers=sme, json=review).status_code == 403
+    stranger = login("sme-001@sme.demo")
+    assert client.get(f"/feedback/reputation/{sme_id}", headers=stranger).status_code == 403
+    # Attending more sessions than exist is refused, and so is a review with no rating
+    bad = {**review, "context": {"total_sessions": 5, "sessions_attended": 6}}
+    assert client.post("/feedback/engagement", headers=officer, json=bad).status_code == 422
+    assert (
+        client.post("/feedback/engagement", headers=officer, json={**review, "rating": 0}).status_code
+        == 422
+    )
+
+    ok = client.post("/feedback/engagement", headers=officer, json=review)
+    assert ok.status_code == 201, ok.text
+    assert client.post("/feedback/engagement", headers=officer, json=review).status_code == 409
+
+    rep = client.get("/feedback/reputation/mine", headers=sme).json()
+    assert rep["rating"] == 4.0 and rep["reviews"] == 1
+    card = rep["reviews_list"][0]
+    assert card["reviewer_type"] == "Support programme" and card["kind_label"] == "Training Programme"
+    assert card["context"]["sessions_attended"] == 4 and card["basis"] == "assisted"
+    assert [b["key"] for b in rep["badges"]] == ["training"]  # attendance is not full, no 100% badge
+    assert rep["stats"]["programmes"] == 1 and rep["timeline"][0]["detail"].startswith("4/5")
+
+    # The rating is context only. The matching engine never reads reviews or ratings.
+    engine_dir = pathlib.Path(__file__).resolve().parents[1] / "app" / "engine"
+    source = " ".join(p.read_text(encoding="utf-8").lower() for p in engine_dir.glob("*.py"))
+    assert "feedback" not in source and "review" not in source and "rating" not in source
+
+
+def _second_admin() -> dict:
+    from app.auth import hash_password
+
+    email = f"second-{uuid.uuid4().hex[:6]}@kopano.demo"
+    with engine.begin() as c:
+        c.execute(
+            text(
+                "insert into core.users (email, password_hash, full_name, role, consent_version) "
+                "values (:e, :p, 'Second Reviewer', 'admin', 'test')"
+            ),
+            {"e": email, "p": hash_password("Demo-Password-1!")},
+        )
+    return login(email)
+
+
+def test_enforcement_suspends_at_once_blacklists_only_with_two_people_and_can_be_reversed():
+    admin, other = login("admin@kopano.demo"), _second_admin()
+    corp = login("corporate@kopano.demo")
+    name = "Emerging Surfacing"
+    roads = "Provincial roads rehabilitation"
+    match = _match_id(corp, roads, name)
+    org_id = next(
+        r["sme_id"]
+        for r in client.get(f"/opportunities/{opp_id(corp, roads)}/matches", headers=corp).json()
+        if r["sme_name"] == name
+    )
+    sme = login(_email_of(name))
+
+    # Only administrators can see or use any of it
+    assert client.get("/enforcement/overview", headers=corp).status_code == 403
+    assert client.get("/enforcement/overview", headers=sme).status_code == 403
+    assert client.get("/enforcement/status", headers=sme).json() == {"status": "clear"}
+
+    case_body = {
+        "organisation_id": org_id,
+        "reasons": ["fake_documents"],
+        "severity": "medium",
+        "notes": "A certificate looks altered.",
+        "evidence": [],
+    }
+    try:
+        case = client.post("/enforcement/cases", headers=admin, json=case_body)
+        assert case.status_code == 201 and case.json()["entity_status"] == "under_review"
+        cid = case.json()["id"]
+        act = lambda who, **kw: client.post(f"/enforcement/cases/{cid}/action", headers=who, json=kw)  # noqa: E731
+
+        # Emergency suspension is for severe cases, needs a recorded reason, and needs no warning first
+        assert act(admin, action="emergency_suspend", note="Forged document seen").status_code == 409
+        severe = client.post(
+            "/enforcement/cases", headers=admin, json={**case_body, "severity": "critical"}
+        ).json()["id"]
+        sev = lambda who, **kw: client.post(f"/enforcement/cases/{severe}/action", headers=who, json=kw)  # noqa: E731
+        assert sev(admin, action="emergency_suspend", note="short").status_code == 422
+        done = sev(admin, action="emergency_suspend", note="Forged certificate, active scam risk")
+        assert done.status_code == 200 and done.json()["entity_status"] == "suspended"
+        assert done.json()["emergency"] is True
+
+        # Suspended means out of matching, blocked from acting, and told why, without the details
+        ranked = client.get(f"/opportunities/{opp_id(corp, roads)}/matches", headers=corp).json()
+        assert name not in [r["sme_name"] for r in ranked]
+        blocked = client.post(f"/matches/{match}/shortlist", headers=corp)
+        assert blocked.status_code == 409 and "ACTION BLOCKED" in blocked.json()["detail"]
+        refused = client.post(f"/applications/{match}", headers=sme)
+        assert refused.status_code == 403 and "ACCOUNT_SUSPENDED" in refused.json()["detail"]
+        mine = client.get("/enforcement/status", headers=sme).json()
+        assert mine["status"] == "suspended" and mine["reference"] and "temporarily suspended" in mine["message"]
+        assert "reasons" not in mine and "evidence" not in mine
+
+        # A blacklist needs evidence, a justification, and a second person to approve
+        assert sev(admin, action="recommend_blacklist", note="Confirmed forgery").status_code == 409
+        assert sev(admin, action="add_evidence", note="Added evidence", evidence={"kind": "document check", "note": "Hash and issuer mismatch"}).status_code == 200
+        assert sev(admin, action="recommend_blacklist", note="Confirmed forgery on review").status_code == 200
+        assert sev(admin, action="approve_blacklist", note="I approve my own proposal").status_code == 403
+        approved = sev(other, action="approve_blacklist", note="Evidence reviewed and agreed")
+        assert approved.status_code == 200 and approved.json()["entity_status"] == "blacklisted"
+
+        # The business can appeal; a reviewer decides; reinstating restores it and keeps the history
+        assert client.post("/enforcement/appeal", headers=sme, json={"text": "short"}).status_code == 422
+        made = client.post("/enforcement/appeal", headers=sme, json={"text": "The certificate is genuine, here is the issuer's letter."})
+        assert made.status_code == 201
+        assert client.post("/enforcement/appeal", headers=sme, json={"text": "Sending it twice again."}).status_code == 409
+        decided = client.post(
+            f"/enforcement/appeals/{made.json()['id']}/decide",
+            headers=other,
+            json={"decision": "approve", "note": "Issuer confirmed the certificate"},
+        )
+        assert decided.status_code == 200
+        assert client.get("/enforcement/status", headers=sme).json()["status"] == "clear"
+        detail = client.get(f"/enforcement/cases/{severe}", headers=admin).json()
+        assert [h["action"] for h in detail["history"]][-1] == "open_case"
+        assert {"emergency_suspend", "approve_blacklist", "reinstate"} <= {h["action"] for h in detail["history"]}
+        ranked = client.get(f"/opportunities/{opp_id(corp, roads)}/matches", headers=corp).json()
+        assert name in [r["sme_name"] for r in ranked]
+    finally:
+        with engine.begin() as c:
+            c.execute(
+                text("update core.organisations set enforcement_status='clear', restrictions='{}' where id=:i"),
+                {"i": org_id},
+            )

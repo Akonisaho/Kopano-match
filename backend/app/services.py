@@ -34,6 +34,8 @@ def load_smes(db: Session, only_visible: bool = True) -> list[SME]:
     )
     if only_visible:
         q = q.where(m.SmeProfile.visible_to_corporates.is_(True))
+    # Hard eligibility gate: a suspended or blacklisted business is not matched, whatever its score
+    q = q.where(m.Organisation.enforcement_status.notin_(("suspended", "blacklisted")))
     rows = db.execute(q).all()
     docs: dict[uuid.UUID, dict[str, m.Document]] = {}
     for d in db.scalars(select(m.Document).order_by(m.Document.uploaded_at)):

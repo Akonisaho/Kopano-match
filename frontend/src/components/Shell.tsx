@@ -6,10 +6,11 @@ import { LangSwitch, useT } from '../i18n'
 import { Logo } from '../ui'
 import { Icon } from './Icon'
 import NotificationBell from './NotificationBell'
+import { StatusBanner } from '../pages/Enforcement'
 
 const ICON: Record<string, string> = {
   OV: 'home', PF: 'user', VR: 'shield', DC: 'file', OP: 'search', AP: 'send', CN: 'users', SC: 'lock',
-  PO: 'plus', SL: 'bookmark', SME: 'building', UM: 'unlock', IM: 'chart', RQ: 'inbox', FB: 'award', EC: 'trending',
+  PO: 'plus', SL: 'bookmark', SME: 'building', UM: 'unlock', IM: 'chart', RQ: 'inbox', FB: 'award', EC: 'trending', RE: 'shield',
 }
 const initialsOf = (name: string) => name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
@@ -24,14 +25,15 @@ const NAV: Record<string, NavItem[]> = {
     ['/app/smes', 'Verified SMEs', 'SME'], ['/app/impact', 'Impact', 'IM'],
     ['/app/applications', 'Applications', 'AP', true], ['/app/insights', 'Unlock Map', 'UM', true],
     ['/app/feedback', 'Feedback', 'FB', true], ['/app/security', 'Trust & security', 'SC', true]],
-  admin: [['/app/ecosystem', 'Ecosystem', 'EC'], ['/app/queue', 'Review queue', 'RQ'], ['/app/security', 'Trust & security', 'SC', true]],
+  admin: [['/app/ecosystem', 'Ecosystem', 'EC'], ['/app/queue', 'Review queue', 'RQ'], ['/app/enforcement', 'Risk & enforcement', 'RE'],
+    ['/app/security', 'Trust & security', 'SC', true]],
 }
 
 const TITLES: [string, string][] = [
   ['/app/profile', 'Business profile'], ['/app/verification', 'Verification centre'], ['/app/documents', 'Documents'],
   ['/app/opportunities/', 'Opportunity'], ['/app/opportunities', 'Opportunities'], ['/app/applications', 'Applications'],
   ['/app/post', 'Create opportunity'], ['/app/shortlist', 'Shortlists'], ['/app/smes', 'Verified SMEs'], ['/app/insights', 'Unlock Map'], ['/app/impact', 'Impact report'], ['/app/consortia', 'Consortium invitations'],
-  ['/app/security', 'Trust & security'], ['/app/queue', 'Review queue'], ['/app/ecosystem', 'Ecosystem'], ['/app/feedback', 'Feedback'], ['/app/matches/', 'Match detail'], ['/app', 'Dashboard'],
+  ['/app/security', 'Trust & security'], ['/app/enforcement', 'Risk & enforcement'], ['/app/queue', 'Review queue'], ['/app/ecosystem', 'Ecosystem'], ['/app/feedback', 'Feedback'], ['/app/matches/', 'Match detail'], ['/app', 'Dashboard'],
 ]
 
 function useSessionLeft() {
@@ -94,7 +96,7 @@ export default function Shell() {
             </span>
           </div>
         </header>
-        <div className="app-content"><Outlet /></div>
+        <div className="app-content">{me.role !== 'admin' && <StatusBanner />}<Outlet /></div>
       </main>
     </div>
   )

@@ -39,6 +39,20 @@ export function OppCard({ o }: { o: PublicCard }) {
 }
 
 const KIND_ORDER: Kind[] = ['procurement', 'grant', 'funding', 'training', 'support']
+
+// What people say for each type, so "training" finds a training programme and "tender" a procurement
+const KIND_WORDS: Record<Kind, string> = {
+  procurement: 'procurement tender contract supply',
+  grant: 'grant grants',
+  funding: 'funding finance loan capital',
+  training: 'training course workshop skills learning',
+  support: 'support business support mentoring accelerator',
+}
+/** Every word typed or spoken must appear somewhere in the card, including its type. */
+function matches(o: PublicCard, q: string) {
+  const hay = `${o.title} ${o.provider} ${o.sector} ${o.province} ${o.kind} ${KIND_WORDS[o.kind]}`.toLowerCase()
+  return q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => hay.includes(w))
+}
 type Sort = 'closing' | 'value'
 
 export function PublicOpportunities() {
@@ -59,7 +73,7 @@ export function PublicOpportunities() {
     const rows = all.filter((o) =>
       (kind === 'all' || o.kind === kind) && (!sector || o.sector === sector) && (!province || o.province === province)
       && (!soon || (daysUntil(o.deadline) ?? 999) <= 14)
-      && `${o.title} ${o.provider} ${o.sector} ${o.province}`.toLowerCase().includes(q.toLowerCase()))
+      && matches(o, q))
     const far = '9999-12-31'
     return rows.sort((a, b) => sort === 'value' ? b.contract_value - a.contract_value : (a.deadline ?? far).localeCompare(b.deadline ?? far))
   }, [all, kind, q, sector, province, soon, sort])

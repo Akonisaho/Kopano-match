@@ -568,10 +568,20 @@ def ecosystem(db: Session) -> dict:
 # ---------------------------------------------------------------- semantic search
 
 
+KIND_WORDS = {
+    "procurement": "procurement tender contract supply",
+    "grant": "grant funding for businesses",
+    "funding": "funding finance loan capital",
+    "training": "training course workshop skills learning",
+    "support": "business support mentoring accelerator",
+}
+
+
 def _opp_text(o: m.Opportunity) -> str:
     scope = [CAPABILITIES.get(i["code"], ("", i["code"]))[1] for i in o.scope_items]
     return (
-        f"{o.title}. Sector {o.sector}, {o.province}. Needs {', '.join(scope)}. "
+        f"{o.title}. Type: {o.kind}, {KIND_WORDS.get(o.kind, '')}. "
+        f"Sector {o.sector}, {o.province}. Needs {', '.join(scope)}. "
         f"{(o.description or '')[:1200]}"
     )
 

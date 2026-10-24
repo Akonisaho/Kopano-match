@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api, dateFmt, zar, type FeedbackItem, type Performance } from '../api'
 import { useLoad } from '../hooks'
 import { Badge, Modal, Panel, Spinner, Welcome, useToast } from '../ui'
+import { EngagementPanel, KIND_LABEL, ReputationPanel } from '../components/Reputation'
 
 export const CRITERIA: [string, string][] = [
   ['quality', 'Quality of work'], ['delivery', 'Delivery on time'], ['responsiveness', 'Responsiveness'],
@@ -23,14 +24,12 @@ function Rating({ value, onChange }: { value: number; onChange?: (n: number) => 
 }
 
 /** A business's track record. Fewer than three reviews is labelled an early signal, not a rating. */
-export function PerformanceCard({ p, mine }: { p: Performance; mine?: boolean }) {
-  if (!p.reviews) {
-    return <Panel title="Track record"><p className="hint" style={{ margin: 0 }}>{mine ? 'No feedback yet. Buyers can rate your work once they have awarded it to you.' : 'No feedback on record yet.'}</p></Panel>
-  }
+export function PerformanceCard({ p }: { p: Performance; mine?: boolean }) {
+  // The headline star rating lives in the Ratings & reviews panel. This is the delivery detail
+  // behind it, and only exists once a buyer has rated awarded work on the six criteria.
+  if (!p.criteria.some((c) => c.average != null)) return null
   return (
-    <Panel title="Track record" sub={`${p.reviews} review${p.reviews === 1 ? '' : 's'} from buyers that awarded this business work`}
-      right={<Badge tone={p.reliable ? 'green' : 'amber'}>{p.reliable ? 'Established' : 'Early signal'}</Badge>}>
-      <div className="perf-head"><b className="perf-score">{p.overall?.toFixed(1)}</b><span className="hint">out of 5 overall</span></div>
+    <Panel title="Delivery detail" sub="How buyers rated awarded work, by criterion">
       {p.criteria.map((c) => (
         <div key={c.key} style={{ marginBottom: 9 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span>{c.label}</span><b className="mono">{c.average ?? '–'}</b></div>
@@ -43,7 +42,6 @@ export function PerformanceCard({ p, mine }: { p: Performance; mine?: boolean })
           {p.summary.strengths.length > 0 && <p style={{ margin: '6px 0 0' }}><b>Strengths:</b> {p.summary.strengths.join(', ')}</p>}
           {p.summary.development_areas.length > 0 && <p style={{ margin: '4px 0 0' }}><b>To improve:</b> {p.summary.development_areas.join(', ')}</p>}
         </div>)}
-      {!p.reliable && <p className="hint" style={{ marginBottom: 0 }}>Fewer than three reviews, so treat this as a first impression and not a verdict.</p>}
       {p.disputed_open > 0 && <p className="hint" style={{ marginBottom: 0 }}>{p.disputed_open} review{p.disputed_open > 1 ? 's are' : ' is'} being looked at by a reviewer.</p>}
     </Panel>
   )
@@ -87,7 +85,14 @@ function FeedbackCard({ f, right, both }: { f: FeedbackItem; right?: React.React
         <Badge tone={STATUS_TONE[f.status]}>{STATUS_LABEL[f.status]}</Badge>
       </div>
       <div style={{ margin: '8px 0' }}><Rating value={Math.round(avg)} /> <span className="mono hint">{avg.toFixed(1)} average</span></div>
-      <div className="criteria-line">{CRITERIA.map(([k, label]) => <span key={k}>{label} <b>{f.ratings[k]}</b></span>)}</div>
+      <div className="rv-meta" style={{ margin: '0 0 8px' }}>
+        <span className="rv-kind">{f.programme ? `${f.programme} · ` : ''}{KIND_LABEL[f.kind] ?? f.kind}</span>
+        {f.context.total_sessions != null && f.context.sessions_attended != null && <span className="rv-pill">Attendance: {f.context.sessions_attended}/{f.context.total_sessions}</span>}
+        {f.context.duration && <span className="rv-pill">{f.context.duration}</span>}
+        {f.context.completion && <span className="rv-pill">{f.context.completion.replace('_', ' ')}</span>}
+        <span className="rv-pill ok">✓ Verified review</span>
+      </div>
+      {f.ratings.quality != null && <div className="criteria-line">{CRITERIA.map(([k, label]) => <span key={k}>{label} <b>{f.ratings[k]}</b></span>)}</div>}
       {f.comment && <p className="quote">{f.comment}</p>}
       {f.response && <p className="quote reply"><b>Business response:</b> {f.response}</p>}
       {f.dispute_reason && <p className="quote reply"><b>Dispute:</b> {f.dispute_reason}</p>}
@@ -115,6 +120,7 @@ export function ProviderFeedback() {
               <td><button className="btn btn-primary btn-small" onClick={() => setOpen({ id: a.application_id, sme: a.sme })}>Rate</button></td></tr>))}</tbody>
         </table></div> : <div className="empty"><strong>Nothing waiting</strong>Awards you have made appear here until you rate them.</div>}
       </Panel>
+      <EngagementPanel onDone={reload} />
       <Panel title="Feedback you have given">
         {given.data.length ? given.data.map((f) => <FeedbackCard key={f.id} f={f} />) : <p className="hint" style={{ margin: 0 }}>No feedback given yet.</p>}
       </Panel>
@@ -155,12 +161,16 @@ function Answer({ f, onDone }: { f: FeedbackItem; onDone: () => void }) {
 /** Business view: your track record, and every review with the right to answer. */
 export function SmeFeedback() {
   const d = useLoad(() => api.feedbackMine())
-  if (!d.data) return <Spinner />
+  const rep = useLoad(() => api.myReputation())
+  if (!d.data || !rep.data) return <Spinner />
   return (
     <>
-      <Welcome title="Feedback" text="What buyers have said about work you were awarded. You can add your side, or dispute a review you think is unfair. A reviewer decides disputes." />
+      <Welcome title="My ratings & reviews" text="What verified organisations have said about your work and your programmes. You can add your side, or dispute a review you think is unfair. A reviewer decides disputes." />
       <div className="grid-2" style={{ gridTemplateColumns: '1fr 1.4fr' }}>
-        <PerformanceCard p={d.data.performance} mine />
+        <div>
+          <ReputationPanel r={rep.data} mine showReviews={false} />
+          <PerformanceCard p={d.data.performance} mine />
+        </div>
         <Panel title="Reviews">
           {d.data.items.length ? d.data.items.map((f) => <FeedbackCard key={f.id} f={f} right={<Answer f={f} onDone={d.reload} />} />)
             : <div className="empty"><strong>No reviews yet</strong>Once a buyer awards you work and rates it, it appears here.</div>}

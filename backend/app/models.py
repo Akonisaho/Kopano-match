@@ -307,11 +307,20 @@ class Feedback(Base):
         {"schema": "core"},
     )
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), **PK)
-    application_id: Mapped[uuid.UUID] = mapped_column(fk("core.applications.id"))
+    # Set for a review of awarded work. A programme or engagement review has none; it is tied to a
+    # confirmed relationship instead (see `basis`).
+    application_id: Mapped[uuid.UUID | None] = mapped_column(fk("core.applications.id"))
     sme_id: Mapped[uuid.UUID] = mapped_column(fk("core.organisations.id"))
     provider_org_id: Mapped[uuid.UUID] = mapped_column(fk("core.organisations.id"))
     author_id: Mapped[uuid.UUID] = mapped_column(fk("core.users.id"))
-    ratings: Mapped[dict] = mapped_column(JSONB)  # criterion -> 1..5
+    ratings: Mapped[dict] = mapped_column(JSONB)  # criterion -> 1..5, or {"overall": 1..5}
+    # What the review is about, shown under the review: procurement, training, incubation, ...
+    kind: Mapped[str] = mapped_column(String(24), default="procurement", server_default="procurement")
+    programme: Mapped[str | None] = mapped_column(String(200))
+    # Attendance, duration and completion for programmes. Never a certification claim.
+    context: Mapped[dict | None] = mapped_column(JSONB)
+    # Why the reviewer is allowed to review: award, application or assisted
+    basis: Mapped[str] = mapped_column(String(12), default="award", server_default="award")
     comment: Mapped[str | None] = mapped_column(Text)
     # published, responded, disputed, upheld (dispute lost), removed (dispute won)
     status: Mapped[str] = mapped_column(String(12), default="published")

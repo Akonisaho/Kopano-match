@@ -40,7 +40,11 @@ function RandomToken($bytes) {
 }
 function StopPort($port) {
     Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue |
-        ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
+        ForEach-Object {
+            $p = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue
+            # Only stop our own API and web server, never Docker or anything else
+            if ($p -and $p.ProcessName -match '^(python|pythonw|node)$') { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+        }
 }
 
 if ($RealEmail -and $Email -like "*kopano-test.com") {
@@ -61,15 +65,29 @@ if ($Public) {
     $adminPassword = "Adm-" + (RandomToken 8) + "-Xz9!"
 }
 $env:ADMIN_PASSWORD = $adminPassword
+# Port 8000 is often taken by other tools (Docker stacks), so the demo API uses 8010
+$env:API_URL = "http://127.0.0.1:8010"
 
 Step "Stop the API and the web app if they are running"
-StopPort 8000
+StopPort 8010
 StopPort 5173
 Start-Sleep -Seconds 2
 
+Step "Wait for the database to be ready"
+$ready = $false
+$ErrorActionPreference = "Continue"
+for ($i = 0; $i -lt 45 -and -not $ready; $i++) {
+    $null = python -c "import psycopg2; psycopg2.connect('host=127.0.0.1 port=55432 user=postgres password=postgres dbname=postgres', connect_timeout=3).close()" 2>&1
+    if ($LASTEXITCODE -eq 0) { $ready = $true } else { Start-Sleep -Seconds 2 }
+}
+$ErrorActionPreference = "Stop"
+if (-not $ready) { throw "The database is not answering on port 55432. Open Docker Desktop, wait for 'Engine running', run 'docker compose up -d', and try again." }
+
 function BuildAndServeWeb {
     Push-Location $frontend
-    npm run build | Out-Null
+    $ErrorActionPreference = "Continue"
+    npm run build 2>&1 | Out-Null
+    $ErrorActionPreference = "Stop"
     if ($LASTEXITCODE -ne 0) { Pop-Location; throw "The web build failed." }
     Start-Process -WindowStyle Hidden -FilePath npm.cmd -ArgumentList "run", "preview", "--", "--port", "5173", "--strictPort"
     Pop-Location
@@ -108,15 +126,16 @@ if ($Public -and -not $NoTunnel) {
 
 Step "Create a clean database"
 python seed.py --empty | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Creating the database failed. Wait a minute for Docker's database to finish starting and run this again." }
 
 Step "Start the API"
-$api = Start-Process -WindowStyle Hidden -PassThru -FilePath python -ArgumentList "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"
+$api = Start-Process -WindowStyle Hidden -PassThru -FilePath python -ArgumentList "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8010"
 for ($i = 0; $i -lt 30; $i++) {
-    try { if ((Invoke-RestMethod http://127.0.0.1:8000/health -TimeoutSec 2).status -eq "ok") { break } } catch { Start-Sleep -Seconds 1 }
+    try { if ((Invoke-RestMethod http://127.0.0.1:8010/health -TimeoutSec 2).status -eq "ok") { break } } catch { Start-Sleep -Seconds 1 }
 }
 
 Step "Build the demo businesses, buyers, awards and feedback"
-python scripts/build_demo.py --email $Email
+python scripts/build_demo.py --email $Email --api http://127.0.0.1:8010
 if ($LASTEXITCODE -ne 0) { throw "The demo build failed. Read the message above." }
 
 if (-not $Dev -and -not ($Public -and -not $NoTunnel)) {

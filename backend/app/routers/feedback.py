@@ -16,7 +16,7 @@ from .. import models as m
 from ..audit import write_audit
 from ..auth import PROVIDER_ROLES, require_role
 from ..db import get_db
-from ..schemas import FeedbackIn, FeedbackResolveIn, FeedbackResponseIn
+from ..schemas import EngagementIn, FeedbackIn, FeedbackResolveIn, FeedbackResponseIn
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
 
@@ -27,6 +27,9 @@ def _view(f: m.Feedback, names: dict) -> dict:
         "sme": names.get(f.sme_id),
         "provider": names.get(f.provider_org_id),
         "ratings": f.ratings,
+        "kind": f.kind,
+        "programme": f.programme,
+        "context": f.context or {},
         "comment": f.comment,
         "status": f.status,
         "response": f.sme_response,
@@ -121,6 +124,109 @@ def track_record(
     return insights.performance(db, sme_org_id)
 
 
+@router.get("/reputation/mine")
+def my_reputation(user: m.User = Depends(require_role("sme")), db: Session = Depends(get_db)):
+    return insights.reputation(db, user.organisation_id)
+
+
+@router.get("/reputation/{sme_org_id}")
+def reputation(
+    sme_org_id: uuid.UUID,
+    user: m.User = Depends(require_role(*PROVIDER_ROLES, "admin")),
+    db: Session = Depends(get_db),
+):
+    """The star rating and verified reviews of a business that has chosen to be visible."""
+    profile = db.scalar(select(m.SmeProfile).where(m.SmeProfile.organisation_id == sme_org_id))
+    if profile is None or (user.role != "admin" and not profile.visible_to_corporates):
+        raise HTTPException(404, "Not found")
+    return insights.reputation(db, sme_org_id)
+
+
+def _confirmed(db: Session, provider_org: uuid.UUID) -> dict[uuid.UUID, str]:
+    """Businesses this organisation has a confirmed relationship with, and why.
+
+    A business applied to one of its opportunities, or it signed the business up itself.
+    """
+    out: dict[uuid.UUID, str] = {}
+    for (sme_id,) in db.execute(
+        select(m.Match.sme_id)
+        .join(m.Application, m.Application.match_id == m.Match.id)
+        .join(m.Opportunity, m.Opportunity.id == m.Match.opportunity_id)
+        .where(m.Opportunity.organisation_id == provider_org)
+    ):
+        out[sme_id] = "application"
+    for (org_id,) in db.execute(
+        select(m.User.organisation_id).where(
+            m.User.assisted_by == provider_org, m.User.organisation_id.is_not(None)
+        )
+    ):
+        out.setdefault(org_id, "assisted")
+    return out
+
+
+@router.get("/engagement/eligible")
+def eligible(user: m.User = Depends(require_role(*PROVIDER_ROLES)), db: Session = Depends(get_db)):
+    """The businesses this organisation may review for a programme or engagement."""
+    confirmed = _confirmed(db, user.organisation_id)
+    if not confirmed:
+        return []
+    orgs = db.scalars(select(m.Organisation).where(m.Organisation.id.in_(confirmed)))
+    return sorted(
+        ({"sme_id": o.id, "name": o.name, "basis": confirmed[o.id]} for o in orgs),
+        key=lambda r: r["name"],
+    )
+
+
+@router.post("/engagement", status_code=201)
+def leave_engagement(
+    body: EngagementIn,
+    user: m.User = Depends(require_role(*PROVIDER_ROLES)),
+    db: Session = Depends(get_db),
+):
+    """Review a programme or relationship that is not an award. Only a confirmed relationship counts."""
+    basis = _confirmed(db, user.organisation_id).get(body.sme_id)
+    if basis is None:
+        raise HTTPException(403, "You can only review a business you have a confirmed relationship with")
+    if db.scalar(
+        select(m.Feedback.id).where(
+            m.Feedback.provider_org_id == user.organisation_id,
+            m.Feedback.sme_id == body.sme_id,
+            m.Feedback.kind == body.kind,
+            m.Feedback.programme == body.programme,
+        )
+    ):
+        raise HTTPException(409, "You have already reviewed this programme for this business")
+    fb = m.Feedback(
+        sme_id=body.sme_id,
+        provider_org_id=user.organisation_id,
+        author_id=user.id,
+        ratings={"overall": body.rating},
+        comment=body.comment,
+        kind=body.kind,
+        programme=body.programme,
+        context=body.context.model_dump(exclude_none=True) if body.context else None,
+        basis=basis,
+    )
+    db.add(fb)
+    db.flush()
+    write_audit(
+        db, user.id, "engagement_review_left", "feedback", fb.id,
+        new={"kind": body.kind, "rating": body.rating, "basis": basis},
+    )
+    db.commit()
+    notifications.feedback_received(db, fb)
+    return {"id": fb.id, "status": fb.status}
+
+
+_KIND_OF_OPPORTUNITY = {
+    "procurement": "procurement",
+    "grant": "grant",
+    "funding": "funding",
+    "training": "training",
+    "support": "business_support",
+}
+
+
 @router.post("/{application_id}", status_code=201)
 def leave(
     application_id: uuid.UUID,
@@ -144,6 +250,9 @@ def leave(
         author_id=user.id,
         ratings=body.ratings,
         comment=body.comment,
+        kind=_KIND_OF_OPPORTUNITY.get(opp.kind, "other"),
+        programme=opp.title,
+        basis="award",
     )
     db.add(fb)
     db.flush()

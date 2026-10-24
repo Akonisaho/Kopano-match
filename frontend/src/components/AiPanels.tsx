@@ -4,6 +4,7 @@ import { api, dateFmt, pretty, QUADRANT_LABEL, zar, type Doc, type DocReading, t
 import { useLoad } from '../hooks'
 import { useT } from '../i18n'
 import { PerformanceCard } from '../pages/Feedback'
+import { TrackRecordReviews } from './Reputation'
 import { Badge, Modal, Panel, Spinner, useToast } from '../ui'
 import { VoiceButton } from './Voice'
 
@@ -128,7 +129,7 @@ export function TrackRecord({ smeId }: { smeId: string }) {
   const t = useLoad<Performance>(() => api.trackRecord(smeId), [smeId])
   if (t.error) return null
   if (!t.data) return <Spinner />
-  return <PerformanceCard p={t.data} />
+  return <><TrackRecordReviews smeId={smeId} /><PerformanceCard p={t.data} /></>
 }
 
 /** Bulk-load opportunities from a CSV export. Checked first, all or nothing. */

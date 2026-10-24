@@ -827,3 +827,82 @@ def test_the_engine_reads_no_free_text_and_says_which_inputs_it_does_read():
     assert not {"description", "bio", "language", "notes"} & set(
         e["inputs"]["business"] + e["inputs"]["opportunity"]
     )
+
+
+def test_programme_reviews_need_a_confirmed_relationship_and_never_touch_a_score():
+    import pathlib
+
+    officer = login("support@kopano.demo")
+    n = uuid.uuid4().hex[:8]
+    name = f"Reviewed {n}"
+    body = {
+        "full_name": "Lindiwe Ncube",
+        "email": f"{n}@kopano-test.com",
+        "organisation_name": name,
+        "registration_number": f"2022/{int(n, 16) % 900000 + 100000}/06",
+        "language": "en",
+        "consent": True,
+    }
+    made = client.post("/assist/businesses", headers=officer, json=body)
+    assert made.status_code == 201, made.text
+    token = made.json()["setup_link"].split("token=")[1]
+    pw = "a-brand-new-long-password"
+    client.post("/auth/reset", json={"token": token, "new_password": pw})
+    sme = {
+        "Authorization": "Bearer "
+        + client.post("/auth/login", data={"username": body["email"], "password": pw}).json()[
+            "access_token"
+        ]
+    }
+
+    # A new business is "no ratings yet", never a zero
+    fresh = client.get("/feedback/reputation/mine", headers=sme).json()
+    assert fresh["rating"] is None and fresh["reviews"] == 0 and fresh["badges"] == []
+
+    eligible = {r["name"]: r for r in client.get("/feedback/engagement/eligible", headers=officer).json()}
+    assert eligible[name]["basis"] == "assisted"
+    sme_id = eligible[name]["sme_id"]
+    review = {
+        "sme_id": sme_id,
+        "kind": "training",
+        "programme": "Financial Management Training",
+        "rating": 4,
+        "comment": "Attended four of the five days and took part well.",
+        "context": {
+            "duration": "5 days",
+            "total_sessions": 5,
+            "sessions_attended": 4,
+            "completion": "completed",
+        },
+    }
+
+    # Only a confirmed relationship can review: another programme, a buyer with no history, a business
+    outsider = login("corporate@kopano.demo")
+    assert client.post("/feedback/engagement", headers=outsider, json=review).status_code == 403
+    assert client.post("/feedback/engagement", headers=sme, json=review).status_code == 403
+    stranger = login("sme-001@sme.demo")
+    assert client.get(f"/feedback/reputation/{sme_id}", headers=stranger).status_code == 403
+    # Attending more sessions than exist is refused, and so is a review with no rating
+    bad = {**review, "context": {"total_sessions": 5, "sessions_attended": 6}}
+    assert client.post("/feedback/engagement", headers=officer, json=bad).status_code == 422
+    assert (
+        client.post("/feedback/engagement", headers=officer, json={**review, "rating": 0}).status_code
+        == 422
+    )
+
+    ok = client.post("/feedback/engagement", headers=officer, json=review)
+    assert ok.status_code == 201, ok.text
+    assert client.post("/feedback/engagement", headers=officer, json=review).status_code == 409
+
+    rep = client.get("/feedback/reputation/mine", headers=sme).json()
+    assert rep["rating"] == 4.0 and rep["reviews"] == 1
+    card = rep["reviews_list"][0]
+    assert card["reviewer_type"] == "Support programme" and card["kind_label"] == "Training Programme"
+    assert card["context"]["sessions_attended"] == 4 and card["basis"] == "assisted"
+    assert [b["key"] for b in rep["badges"]] == ["training"]  # attendance is not full, no 100% badge
+    assert rep["stats"]["programmes"] == 1 and rep["timeline"][0]["detail"].startswith("4/5")
+
+    # The rating is context only. The matching engine never reads reviews or ratings.
+    engine_dir = pathlib.Path(__file__).resolve().parents[1] / "app" / "engine"
+    source = " ".join(p.read_text(encoding="utf-8").lower() for p in engine_dir.glob("*.py"))
+    assert "feedback" not in source and "review" not in source and "rating" not in source

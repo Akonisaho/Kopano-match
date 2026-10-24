@@ -654,6 +654,70 @@ def main():
         "  BuildRight Contractors has not answered yet: sign in as that account to accept it live."
     )
 
+    print("Recording programme history: training, incubation, grant ...")
+    # A programme review needs a confirmed relationship, so each business applies first.
+    joined = {
+        "Tender writing and compliance masterclass": (
+            "Masego Infrastructure", "Nomsa Builders", "Sizwe Road Works", "Tumelo Roadworks",
+        ),
+        "Supplier readiness accelerator": ("Masego Infrastructure", "Sizwe Road Works"),
+        "Youth enterprise growth grant": ("Sizwe Road Works",),
+    }
+    for title, names in joined.items():
+        by_role, oid = opp_ids[title]
+        _, rows = api.call("GET", f"/opportunities/{oid}/matches", ptoken[by_role])
+        for row in rows if isinstance(rows, list) else []:
+            if row["sme_name"] in names:
+                api.call("POST", f"/applications/{row['match_id']}", stokens[row["sme_name"]])
+    sme_ids = {}
+    _, eligible = api.call("GET", "/feedback/engagement/eligible", ptoken["support"])
+    for row in eligible if isinstance(eligible, list) else []:
+        sme_ids[row["name"]] = row["sme_id"]
+    _, eligible = api.call("GET", "/feedback/engagement/eligible", ptoken["funder"])
+    for row in eligible if isinstance(eligible, list) else []:
+        sme_ids[row["name"]] = row["sme_id"]
+
+    course = "Tender Writing and Compliance Masterclass"
+    engagements = (
+        ("support", "Masego Infrastructure", "training", course, 4,
+         "Attended four of the five days and took an active part in the compliance workshops.",
+         dict(duration="5 days", total_sessions=5, sessions_attended=4, completion="completed")),
+        ("support", "Masego Infrastructure", "incubation", "SME Growth Incubation", 5,
+         "Completed the full programme and improved sharply in planning, procurement readiness "
+         "and financial management.",
+         dict(duration="12 months", completion="completed")),
+        ("support", "Sizwe Road Works", "training", course, 5,
+         "Attended every session and brought real tender documents to work on.",
+         dict(duration="5 days", total_sessions=5, sessions_attended=5, completion="completed")),
+        ("support", "Nomsa Builders", "training", course, 4,
+         "Strong participation. Missed no sessions and asked good questions on pricing.",
+         dict(duration="5 days", total_sessions=5, sessions_attended=5, completion="completed")),
+        ("support", "Tumelo Roadworks", "training", course, 3,
+         "Attended two of the five days so far. Still working through the programme.",
+         dict(duration="5 days", total_sessions=5, sessions_attended=2, completion="in_progress")),
+        ("funder", "Sizwe Road Works", "grant", "Youth Enterprise Growth Grant", 5,
+         "Used the grant as agreed and reported on time.",
+         dict(duration="6 months", completion="completed")),
+    )
+    for role, name, kind, programme, rating, comment, context in engagements:
+        if name not in sme_ids:
+            fail(f"{name} has no confirmed relationship with the {role} organisation")
+        status, body = api.call(
+            "POST",
+            "/feedback/engagement",
+            ptoken[role],
+            body={
+                "sme_id": sme_ids[name],
+                "kind": kind,
+                "programme": programme,
+                "rating": rating,
+                "comment": comment,
+                "context": context,
+            },
+        )
+        if status != 201:
+            fail(f"programme review for {name}: {status} {body.get('detail')}")
+
     print("Warming the AI results so every page opens instantly ...")
     from concurrent.futures import ThreadPoolExecutor
 

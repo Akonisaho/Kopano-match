@@ -65,8 +65,31 @@ def _counted(f: m.Feedback) -> bool:
     return f.status != "removed"
 
 
-def performance(db: Session, sme_org_id: uuid.UUID, with_summary: bool = True) -> dict:
-    rows = [
+KINDS = {
+    "procurement": "Procurement / Contract Delivery",
+    "training": "Training Programme",
+    "incubation": "Incubation Programme",
+    "acceleration": "Acceleration Programme",
+    "mentorship": "Mentorship",
+    "funding": "Funding Programme",
+    "grant": "Grant Programme",
+    "supplier_dev": "Supplier Development Programme",
+    "enterprise_dev": "Enterprise Development Programme",
+    "business_support": "Business Support Programme",
+    "investment": "Investment Relationship",
+    "other": "Other Verified Engagement",
+}
+REVIEWER_TYPES = {"corporate": "Corporate buyer", "funder": "Funder", "support": "Support programme"}
+
+
+def review_overall(f: m.Feedback) -> float:
+    """One review's star rating: the mean of whatever it rated (six criteria, or a single overall)."""
+    vals = list(f.ratings.values())
+    return round(sum(vals) / len(vals), 1) if vals else 0.0
+
+
+def _feedback_rows(db: Session, sme_org_id: uuid.UUID) -> list[m.Feedback]:
+    return [
         f
         for f in db.scalars(
             select(m.Feedback)
@@ -75,13 +98,34 @@ def performance(db: Session, sme_org_id: uuid.UUID, with_summary: bool = True) -
         )
         if _counted(f)
     ]
+
+
+def star_map(db: Session, sme_ids: list[uuid.UUID]) -> dict:
+    """Headline rating for many businesses at once: id -> (rating, number of reviews).
+
+    Shown beside a match. It is never an input to a score, a gate or a shortlist.
+    """
+    if not sme_ids:
+        return {}
+    by: dict = defaultdict(list)
+    for f in db.scalars(select(m.Feedback).where(m.Feedback.sme_id.in_(sme_ids))):
+        if _counted(f):
+            by[f.sme_id].append(review_overall(f))
+    return {k: (round(sum(v) / len(v), 1), len(v)) for k, v in by.items()}
+
+
+def performance(db: Session, sme_org_id: uuid.UUID, with_summary: bool = True) -> dict:
+    rows = _feedback_rows(db, sme_org_id)
     n = len(rows)
-    avg = {k: round(sum(f.ratings.get(k, 0) for f in rows) / n, 2) if n else None for k in CRITERIA}
-    scored = [v for v in avg.values() if v is not None]
+    detailed = [f for f in rows if f.kind == "procurement" and "quality" in f.ratings]
+    d = len(detailed)
+    avg = {
+        k: round(sum(f.ratings.get(k, 0) for f in detailed) / d, 2) if d else None for k in CRITERIA
+    }
     out = {
         "reviews": n,
         "reliable": n >= RELIABLE_AFTER,
-        "overall": round(sum(scored) / len(scored), 2) if scored else None,
+        "overall": round(sum(review_overall(f) for f in rows) / n, 2) if n else None,
         "criteria": [{"key": k, "label": CRITERIA[k], "average": avg[k]} for k in CRITERIA],
         "disputed_open": sum(1 for f in rows if f.status == "disputed"),
         "responded": sum(1 for f in rows if f.sme_response),
@@ -124,6 +168,140 @@ def summarise(db: Session, sme_org_id: uuid.UUID, rows: list[m.Feedback], avg: d
     out = {"source": "ai", **result.model_dump()} if result else fallback
     _store(db, "feedback_summary", sme_org_id, h, out)
     return out
+
+
+def _badges(rows: list[m.Feedback], awards: int) -> list[dict]:
+    """Badges come only from verified records. Nothing here is self-declared."""
+    out: list[dict] = []
+
+    def add(key: str, label: str, why: str) -> None:
+        out.append({"key": key, "label": label, "why": why})
+
+    proc = [f for f in rows if f.kind == "procurement"]
+    if awards:
+        add("awarded", "Work awarded", f"{awards} opportunity award{'s' if awards != 1 else ''} recorded")
+    if proc:
+        add("rated", "Corporate rated", "Rated by a buyer that awarded it work")
+    delivery = [f.ratings["delivery"] for f in proc if "delivery" in f.ratings]
+    if len(delivery) >= 2 and sum(delivery) / len(delivery) >= 4.5:
+        add("delivery", "High delivery rating", "Delivery on time averages 4.5 or more")
+    for f in rows:
+        c = f.context or {}
+        if f.kind in ("incubation", "acceleration") and c.get("completion") == "completed":
+            add("graduate", "Programme graduate", f"Completed {f.programme}")
+            break
+    for f in rows:
+        c = f.context or {}
+        if f.kind == "training" and c.get("total_sessions"):
+            add("training", "Training participant", f"Attendance recorded for {f.programme}")
+            break
+    for f in rows:
+        c = f.context or {}
+        if c.get("total_sessions") and c.get("sessions_attended") == c.get("total_sessions"):
+            add("attendance", "100% attendance", f"Attended every session of {f.programme}")
+            break
+    if any(f.kind in ("funding", "grant") for f in rows):
+        add("funded", "Funding relationship", "A funder has confirmed a funding or grant programme")
+    return out
+
+
+def reputation(db: Session, sme_org_id: uuid.UUID) -> dict:
+    """The familiar view: one star rating and a count, then the individual verified reviews.
+
+    A business with no reviews gets 'no ratings yet', never a zero. The rating is context for a
+    buyer. It is not read by the matching engine and does not move a match score.
+    """
+    rows = _feedback_rows(db, sme_org_id)
+    names = {
+        o.id: o
+        for o in db.scalars(
+            select(m.Organisation).where(m.Organisation.id.in_({f.provider_org_id for f in rows}))
+        )
+    } if rows else {}
+    awards = db.execute(
+        select(m.Application, m.Opportunity)
+        .join(m.Match, m.Match.id == m.Application.match_id)
+        .join(m.Opportunity, m.Opportunity.id == m.Match.opportunity_id)
+        .where(m.Match.sme_id == sme_org_id, m.Application.awarded_at.is_not(None))
+        .order_by(m.Application.awarded_at.desc())
+    ).all()
+    award_orgs = {
+        o.id: o.name
+        for o in db.scalars(
+            select(m.Organisation).where(m.Organisation.id.in_({opp.organisation_id for _, opp in awards}))
+        )
+    } if awards else {}
+
+    reviews = []
+    for f in rows:
+        org = names.get(f.provider_org_id)
+        reviews.append(
+            {
+                "id": f.id,
+                "rating": review_overall(f),
+                "reviewer": org.name if org else "Organisation",
+                "reviewer_type": REVIEWER_TYPES.get(org.org_type, "Organisation") if org else "",
+                "kind": f.kind,
+                "kind_label": KINDS.get(f.kind, KINDS["other"]),
+                "programme": f.programme,
+                "comment": f.comment,
+                "context": f.context or {},
+                "response": f.sme_response,
+                "status": f.status,
+                "basis": f.basis,
+                "created_at": f.created_at,
+            }
+        )
+    n = len(rows)
+    dist = Counter(round(review_overall(f)) for f in rows)
+    timeline = [
+        {
+            "when": f.created_at,
+            "title": f"{names[f.provider_org_id].name if f.provider_org_id in names else 'Organisation'}"
+            f" · {f.programme or KINDS.get(f.kind, '')}",
+            "detail": _context_line(f),
+            "rating": review_overall(f),
+            "type": "review",
+        }
+        for f in rows
+    ] + [
+        {
+            "when": a.awarded_at,
+            "title": f"{award_orgs.get(opp.organisation_id, 'Organisation')} · {opp.title}",
+            "detail": "Awarded",
+            "rating": None,
+            "type": "award",
+        }
+        for a, opp in awards
+    ]
+    timeline.sort(key=lambda t: t["when"], reverse=True)
+    programmes = sum(1 for f in rows if f.kind != "procurement")
+    return {
+        "rating": round(sum(review_overall(f) for f in rows) / n, 1) if n else None,
+        "reviews": n,
+        "reliable": n >= RELIABLE_AFTER,
+        "distribution": {str(s): dist.get(s, 0) for s in (5, 4, 3, 2, 1)},
+        "stats": {
+            "awards": len(awards),
+            "reviewed_contracts": sum(1 for f in rows if f.kind == "procurement"),
+            "programmes": programmes,
+        },
+        "badges": _badges(rows, len(awards)),
+        "reviews_list": reviews,
+        "timeline": timeline,
+    }
+
+
+def _context_line(f: m.Feedback) -> str:
+    c = f.context or {}
+    bits = []
+    if c.get("total_sessions") is not None and c.get("sessions_attended") is not None:
+        bits.append(f"{c['sessions_attended']}/{c['total_sessions']} sessions attended")
+    if c.get("duration"):
+        bits.append(c["duration"])
+    if c.get("completion"):
+        bits.append(c["completion"].replace("_", " ").capitalize())
+    return " · ".join(bits) or KINDS.get(f.kind, "")
 
 
 # ---------------------------------------------------------------- semantic relevance

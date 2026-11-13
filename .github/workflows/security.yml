@@ -19,10 +19,10 @@ jobs:
         language: [python, javascript-typescript]
     steps:
       - uses: actions/checkout@v7
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
   secrets:
     runs-on: ubuntu-latest
     permissions:
@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with: { python-version: '3.12' }
       - run: pip install pip-audit && pip-audit -r backend/requirements.txt
       - uses: actions/setup-node@v7
@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with: { python-version: '3.12' }
       - run: pip install bandit && bandit -r backend/app backend/seed.py -ll
   # Software bill of materials (CycloneDX 1.6) for every build, kept as a downloadable artifact.
@@ -56,7 +56,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with: { python-version: '3.12' }
       - uses: actions/setup-node@v7
         with: { node-version: '20' }
